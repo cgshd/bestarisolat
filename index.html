@@ -10,16 +10,27 @@
 
     <script src="https://cdn.tailwindcss.com"></script>
 
+    <script type="importmap">
+    {
+        "imports": {
+            "react": "https://esm.sh/react@18",
+            "react-dom/client": "https://esm.sh/react-dom@18/client",
+            "react/jsx-runtime": "https://esm.sh/react@18/jsx-runtime",
+            "lucide-react": "https://esm.sh/lucide-react@0.292.0"
+        }
+    }
+    </script>
+
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 </head>
 <body class="bg-gray-50">
     <div id="root"></div>
 
     <script type="text/babel" data-type="module">
-        // 1. นำเข้า React และไลบรารีทั้งหมดผ่าน esm.sh
-        import React, { useState, useEffect } from 'https://esm.sh/react@18';
-        import { createRoot } from 'https://esm.sh/react-dom@18/client';
-        import { Settings, Users, ClipboardList, CheckCircle2, Search, Save, AlertCircle, Download, Sparkles, Loader2, MessageSquareHeart } from 'https://esm.sh/lucide-react@0.292.0';
+        // 1. นำเข้า React และไลบรารีต่างๆ (ตอนนี้เบราว์เซอร์จะรู้แล้วว่าต้องหาจากไหนตาม Import Map)
+        import React, { useState, useEffect } from 'react';
+        import { createRoot } from 'react-dom/client';
+        import { Settings, Users, ClipboardList, CheckCircle2, Search, Save, AlertCircle, Download, Sparkles, Loader2, MessageSquareHeart } from 'lucide-react';
 
         // 2. ข้อมูลจำลองจากไฟล์ CSV
         const mockStudentData = [
@@ -58,7 +69,7 @@
           const [registeredName, setRegisteredName] = useState('');
 
           const callGeminiAPI = async (prompt) => {
-            // 👇 อย่าลืมใส่ API Key ของคุณที่บรรทัดนี้
+            // 👇 อย่าลืมใส่ API Key ของคุณที่บรรทัดนี้ครับ
             const apiKey = "YOUR_API_KEY_HERE"; 
             const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`;
             
