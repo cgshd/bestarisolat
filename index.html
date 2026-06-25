@@ -1,0 +1,544 @@
+import React, { useState, useEffect } from 'react';
+import { Settings, Users, ClipboardList, CheckCircle2, Search, Save, AlertCircle, Download, Sparkles, Loader2, MessageSquareHeart } from 'lucide-react';
+
+// ข้อมูลจำลองจากไฟล์ CSV ที่คุณอัปโหลด (ใส่ไว้บางส่วนเพื่อเป็นตัวอย่างระบบ Auto-fill)
+const mockStudentData = [
+  { id: '26858', title: 'เด็กชาย', firstName: 'อัซรี', lastName: 'เตะ', room: 'ม.1 Berdikari' },
+  { id: '26906', title: 'เด็กชาย', firstName: 'ชารีฟ', lastName: 'ตีมุง', room: 'ม.1 Berdikari' },
+  { id: '26913', title: 'เด็กชาย', firstName: 'อัซวาน', lastName: 'มะแซ', room: 'ม.1 Berdikari' },
+  { id: '26920', title: 'เด็กชาย', firstName: 'นัสรุดดีน', lastName: 'สุหลง', room: 'ม.1 Amanah' },
+  { id: '26931', title: 'เด็กชาย', firstName: 'แวมูฮัมมัด', lastName: 'เซ็ง', room: 'ม.1 Amanah' },
+  { id: '26955', title: 'เด็กชาย', firstName: 'ธนภัตร์', lastName: 'หมัดเลียด', room: 'ม.1 Amanah' },
+  { id: '27043', title: 'เด็กชาย', firstName: 'มูฮัมหมัดชารีฟ', lastName: 'มะแซ', room: 'ม.1 Amanah' },
+];
+
+export default function App() {
+  const [activeTab, setActiveTab] = useState('register');
+  
+  // State สำหรับตั้งค่าโครงการ
+  const [projectSettings, setProjectSettings] = useState({
+    title: 'Bestari Sholat Kali Ke-2',
+    description: 'โครงการอบรมและทดสอบการปฏิบัติศาสนกิจ (ละหมาด) สำหรับนักเรียน',
+    date: '2026-07-15',
+    googleScriptUrl: '' 
+  });
+
+  // State สำหรับฟอร์มลงทะเบียน
+  const [searchId, setSearchId] = useState('');
+  const [studentInfo, setStudentInfo] = useState(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitStatus, setSubmitStatus] = useState(null); // 'success' | 'error' | null
+
+  // State เก็บรายชื่อที่ลงทะเบียนแล้ว (จำลองการเก็บข้อมูล)
+  const [registeredList, setRegisteredList] = useState([]);
+
+  // State สำหรับ AI Features
+  const [aiTopic, setAiTopic] = useState('');
+  const [isGeneratingDesc, setIsGeneratingDesc] = useState(false);
+  const [descAiError, setDescAiError] = useState('');
+  
+  const [aiWelcomeMessage, setAiWelcomeMessage] = useState('');
+  const [isGeneratingWelcome, setIsGeneratingWelcome] = useState(false);
+  const [registeredName, setRegisteredName] = useState('');
+
+  // ------------------------------------------------------------------
+  // Gemini API Integration (with Exponential Backoff Retry)
+  // ------------------------------------------------------------------
+  const callGeminiAPI = async (prompt) => {
+    const apiKey = ""; // API Key will be injected by the environment
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`;
+    
+    const maxRetries = 5;
+    
+    for (let i = 0; i < maxRetries; i++) {
+      try {
+        const response = await fetch(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contents: [{ parts: [{ text: prompt }] }],
+            systemInstruction: { 
+              parts: [{ text: "คุณคือผู้ช่วย AI สำหรับโรงเรียนสอนศาสนาอิสลามในประเทศไทย มีความสุภาพ เป็นมิตร และใช้ภาษาที่เหมาะสมกับการให้ความรู้หรือให้กำลังใจนักเรียน" }] 
+            }
+          })
+        });
+
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+
+        const data = await response.json();
+        const generatedText = data.candidates?.[0]?.content?.parts?.[0]?.text;
+        
+        if (!generatedText) throw new Error("No text generated");
+        return generatedText;
+
+      } catch (error) {
+        if (i === maxRetries - 1) {
+          throw error; // Throw on final attempt
+        }
+        // Exponential backoff: 1s, 2s, 4s, 8s, 16s
+        const delay = 1000 * Math.pow(2, i);
+        await new Promise(resolve => setTimeout(resolve, delay));
+      }
+    }
+  };
+
+  // ------------------------------------------------------------------
+  // Feature 1: AI Project Description Generator (Settings Tab)
+  // ------------------------------------------------------------------
+  const handleGenerateDescription = async () => {
+    if (!aiTopic.trim()) {
+      setDescAiError("กรุณาระบุหัวข้อที่ต้องการให้ AI ช่วยเขียน");
+      setTimeout(() => setDescAiError(''), 3000);
+      return;
+    }
+
+    setIsGeneratingDesc(true);
+    setDescAiError('');
+
+    try {
+      const prompt = `ช่วยเขียนรายละเอียดโครงการแบบเป็นทางการสำหรับกิจกรรมของโรงเรียนมุสลิม ชื่อโครงการ: "${projectSettings.title}" โดยมีเนื้อหาเกี่ยวข้องกับ: "${aiTopic}" ขอให้เขียนสรุปสั้นๆ ประมาณ 1 ย่อหน้า ไม่เกิน 3-4 ประโยค เพื่อนำไปแสดงบนหน้าเว็บไซต์`;
+      const generatedText = await callGeminiAPI(prompt);
+      setProjectSettings(prev => ({ ...prev, description: generatedText.trim() }));
+      setAiTopic('');
+    } catch (error) {
+      console.error("AI Generation Error:", error);
+      setDescAiError("เกิดข้อผิดพลาดในการเชื่อมต่อกับ AI กรุณาลองใหม่อีกครั้ง");
+    } finally {
+      setIsGeneratingDesc(false);
+    }
+  };
+
+  // ------------------------------------------------------------------
+  // Feature 2: AI Personalized Welcome Message (Registration Tab)
+  // ------------------------------------------------------------------
+  const generateWelcomeMessage = async (fullName) => {
+    setIsGeneratingWelcome(true);
+    setAiWelcomeMessage('');
+    
+    try {
+      const prompt = `เขียนข้อความสั้นๆ 1-2 ประโยค เพื่ออวยพรและให้กำลังใจนักเรียนชื่อ "${fullName}" ที่เพิ่งลงทะเบียนเข้าร่วมโครงการ "Bestari Sholat" (โครงการทดสอบการละหมาด) ขอให้อัลลอฮ์ตอบแทนและให้ความสำเร็จ ใช้ภาษาที่อบอุ่นและเป็นกันเอง`;
+      const generatedText = await callGeminiAPI(prompt);
+      setAiWelcomeMessage(generatedText.trim());
+    } catch (error) {
+      console.error("AI Welcome Generation Error:", error);
+      // Fallback message if AI fails
+      setAiWelcomeMessage(`ยินดีต้อนรับ ${fullName} สู่โครงการ ขอให้อัลลอฮ์ตอบแทนความตั้งใจของคุณครับ/ค่ะ`);
+    } finally {
+      setIsGeneratingWelcome(false);
+    }
+  };
+
+  // ------------------------------------------------------------------
+  // การจัดการอื่นๆ ของระบบ
+  // ------------------------------------------------------------------
+  const exportToCSV = () => {
+    if (registeredList.length === 0) return;
+    const BOM = '\uFEFF';
+    const headers = ['ลำดับ', 'วัน-เวลาที่ลงทะเบียน', 'รหัสนักเรียน', 'ชื่อ-นามสกุล', 'ห้องเรียน', 'ชื่อโครงการ'];
+    const csvContent = registeredList.map((user, index) => {
+      return [
+        registeredList.length - index,
+        `"${user.timestamp}"`,
+        `"${user.studentId}"`,
+        `"${user.fullName}"`,
+        `"${user.room}"`,
+        `"${user.projectTitle}"`
+      ].join(',');
+    });
+    const csvData = BOM + headers.join(',') + '\n' + csvContent.join('\n');
+    const blob = new Blob([csvData], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', `ข้อมูลลงทะเบียน_${projectSettings.title.replace(/\s+/g, '_')}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  useEffect(() => {
+    if (searchId.length >= 5) {
+      const found = mockStudentData.find(s => s.id === searchId);
+      if (found) {
+        setStudentInfo(found);
+      } else {
+        setStudentInfo({ isNew: true, id: searchId, title: '', firstName: '', lastName: '', room: '' });
+      }
+    } else {
+      setStudentInfo(null);
+    }
+  }, [searchId]);
+
+  const handleRegister = async (e) => {
+    e.preventDefault();
+    if (!studentInfo) return;
+
+    setIsSubmitting(true);
+    setSubmitStatus(null);
+    setAiWelcomeMessage('');
+
+    const fullName = `${studentInfo.title || ''}${studentInfo.firstName} ${studentInfo.lastName}`;
+    const dataToSubmit = {
+      timestamp: new Date().toLocaleString('th-TH'),
+      studentId: studentInfo.id,
+      fullName: fullName,
+      room: studentInfo.room,
+      projectTitle: projectSettings.title
+    };
+
+    try {
+      setRegisteredList([dataToSubmit, ...registeredList]);
+      
+      if (projectSettings.googleScriptUrl) {
+        await fetch(projectSettings.googleScriptUrl, {
+          method: 'POST',
+          mode: 'no-cors',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(dataToSubmit)
+        });
+      } else {
+        await new Promise(resolve => setTimeout(resolve, 800));
+      }
+
+      setSubmitStatus('success');
+      setRegisteredName(studentInfo.firstName);
+      
+      // Trigger AI Welcome Message generation immediately after success
+      generateWelcomeMessage(studentInfo.firstName);
+
+      setSearchId('');
+      setStudentInfo(null);
+      
+      // Clear main success notification after 5 seconds, but keep the AI message visible
+      setTimeout(() => setSubmitStatus(null), 5000);
+    } catch (error) {
+      setSubmitStatus('error');
+      console.error('Error submitting:', error);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  return (
+    <div className="min-h-screen bg-gray-50 text-gray-800 font-sans">
+      {/* Header */}
+      <header className="bg-emerald-700 text-white shadow-md p-6">
+        <div className="max-w-4xl mx-auto flex flex-col md:flex-row justify-between items-center gap-4">
+          <div>
+            <h1 className="text-2xl font-bold">{projectSettings.title}</h1>
+            <p className="text-emerald-100 text-sm mt-1">{projectSettings.description}</p>
+          </div>
+          <div className="bg-emerald-800 px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap">
+            ลงทะเบียนแล้ว: {registeredList.length} คน
+          </div>
+        </div>
+      </header>
+
+      {/* Navigation Tabs */}
+      <div className="max-w-4xl mx-auto mt-6 px-4">
+        <div className="flex bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+          <button 
+            onClick={() => { setActiveTab('register'); setSubmitStatus(null); setAiWelcomeMessage(''); }}
+            className={`flex-1 py-3 px-2 sm:px-4 flex items-center justify-center gap-2 font-medium transition-colors ${activeTab === 'register' ? 'bg-emerald-50 text-emerald-700 border-b-2 border-emerald-600' : 'text-gray-500 hover:bg-gray-50'}`}
+          >
+            <ClipboardList size={18} /> <span className="hidden sm:inline">ลงทะเบียน</span>
+          </button>
+          <button 
+            onClick={() => setActiveTab('list')}
+            className={`flex-1 py-3 px-2 sm:px-4 flex items-center justify-center gap-2 font-medium transition-colors ${activeTab === 'list' ? 'bg-emerald-50 text-emerald-700 border-b-2 border-emerald-600' : 'text-gray-500 hover:bg-gray-50'}`}
+          >
+            <Users size={18} /> <span className="hidden sm:inline">รายชื่อ</span>
+          </button>
+          <button 
+            onClick={() => setActiveTab('settings')}
+            className={`flex-1 py-3 px-2 sm:px-4 flex items-center justify-center gap-2 font-medium transition-colors ${activeTab === 'settings' ? 'bg-emerald-50 text-emerald-700 border-b-2 border-emerald-600' : 'text-gray-500 hover:bg-gray-50'}`}
+          >
+            <Settings size={18} /> <span className="hidden sm:inline">ตั้งค่า</span>
+          </button>
+        </div>
+      </div>
+
+      {/* Main Content Area */}
+      <main className="max-w-4xl mx-auto mt-6 px-4 pb-12">
+        
+        {/* TAB 1: ลงทะเบียน (Registration) */}
+        {activeTab === 'register' && (
+          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 md:p-8">
+            <h2 className="text-xl font-bold text-gray-800 mb-6 flex items-center gap-2">
+              <ClipboardList className="text-emerald-600" /> ฟอร์มลงทะเบียนเข้าร่วมโครงการ
+            </h2>
+            
+            {submitStatus === 'success' && (
+              <div className="mb-6 bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-lg flex items-start sm:items-center gap-3 animate-in fade-in slide-in-from-top-2">
+                <CheckCircle2 size={24} className="text-green-500 mt-0.5 sm:mt-0 flex-shrink-0" />
+                <div>
+                  <p className="font-bold">ลงทะเบียนสำเร็จ!</p>
+                  <p className="text-sm">ระบบได้บันทึกข้อมูลของคุณเรียบร้อยแล้ว</p>
+                </div>
+              </div>
+            )}
+
+            {/* AI Welcome Message Display */}
+            {(isGeneratingWelcome || aiWelcomeMessage) && (
+              <div className="mb-6 p-5 rounded-xl border border-indigo-100 bg-gradient-to-r from-indigo-50 to-purple-50 text-indigo-900 shadow-sm animate-in zoom-in-95 duration-300">
+                <div className="flex items-center gap-2 mb-2">
+                  <MessageSquareHeart size={20} className="text-indigo-500" />
+                  <h3 className="font-bold text-indigo-800 text-sm">ข้อความจากระบบ AI ถึง {registeredName}</h3>
+                </div>
+                {isGeneratingWelcome ? (
+                  <div className="flex items-center gap-2 text-sm text-indigo-600 font-medium h-6">
+                    <Loader2 size={16} className="animate-spin" /> กำลังสร้างข้อความอวยพร...
+                  </div>
+                ) : (
+                  <p className="text-sm leading-relaxed text-indigo-700 italic">
+                    "{aiWelcomeMessage}"
+                  </p>
+                )}
+              </div>
+            )}
+
+            {submitStatus === 'error' && (
+              <div className="mb-6 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg flex items-center gap-3">
+                <AlertCircle size={24} className="text-red-500" />
+                <div>
+                  <p className="font-bold">เกิดข้อผิดพลาด!</p>
+                  <p className="text-sm">ไม่สามารถบันทึกข้อมูลได้ กรุณาลองใหม่อีกครั้ง</p>
+                </div>
+              </div>
+            )}
+
+            <form onSubmit={handleRegister} className="space-y-6">
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">รหัสนักเรียน (5 หลัก)</label>
+                <div className="relative">
+                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                    <Search className="h-5 w-5 text-gray-400" />
+                  </div>
+                  <input
+                    type="text"
+                    value={searchId}
+                    onChange={(e) => setSearchId(e.target.value.replace(/[^0-9]/g, '').slice(0, 5))}
+                    placeholder="พิมพ์รหัสนักเรียน เช่น 26858"
+                    className="pl-10 w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition-all text-lg"
+                    required
+                  />
+                </div>
+                <p className="text-xs text-gray-500 mt-2">* ระบบจะดึงข้อมูลให้อัตโนมัติ (ลองพิมพ์ 26858 หรือ 26920)</p>
+              </div>
+
+              {studentInfo && (
+                <div className="bg-gray-50 p-5 rounded-lg border border-gray-200 space-y-4 animate-in fade-in slide-in-from-top-4 duration-300">
+                  {studentInfo.isNew ? (
+                    <div className="text-amber-600 text-sm mb-2 flex items-center gap-1">
+                      <AlertCircle size={16} /> ไม่พบข้อมูลในระบบ กรุณากรอกข้อมูลด้วยตนเอง
+                    </div>
+                  ) : null}
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div>
+                      <label className="block text-xs font-semibold text-gray-500 mb-1">คำนำหน้า</label>
+                      <input
+                        type="text"
+                        value={studentInfo.title || ''}
+                        onChange={(e) => setStudentInfo({...studentInfo, title: e.target.value})}
+                        className="w-full p-2.5 border border-gray-300 rounded focus:ring-1 focus:ring-emerald-500 outline-none bg-white"
+                        placeholder="ด.ช. / ด.ญ."
+                        required
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-semibold text-gray-500 mb-1">ชื่อ</label>
+                      <input
+                        type="text"
+                        value={studentInfo.firstName || ''}
+                        onChange={(e) => setStudentInfo({...studentInfo, firstName: e.target.value})}
+                        className="w-full p-2.5 border border-gray-300 rounded focus:ring-1 focus:ring-emerald-500 outline-none bg-white"
+                        required
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-semibold text-gray-500 mb-1">นามสกุล</label>
+                      <input
+                        type="text"
+                        value={studentInfo.lastName || ''}
+                        onChange={(e) => setStudentInfo({...studentInfo, lastName: e.target.value})}
+                        className="w-full p-2.5 border border-gray-300 rounded focus:ring-1 focus:ring-emerald-500 outline-none bg-white"
+                        required
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-500 mb-1">ห้องเรียน</label>
+                    <input
+                      type="text"
+                      value={studentInfo.room || ''}
+                      onChange={(e) => setStudentInfo({...studentInfo, room: e.target.value})}
+                      className="w-full p-2.5 border border-gray-300 rounded focus:ring-1 focus:ring-emerald-500 outline-none bg-white"
+                      placeholder="เช่น ม.1 Berdikari"
+                      required
+                    />
+                  </div>
+                </div>
+              )}
+
+              <button
+                type="submit"
+                disabled={!studentInfo || isSubmitting}
+                className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3.5 px-4 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 shadow-sm"
+              >
+                {isSubmitting ? (
+                   <span className="flex items-center gap-2"><Loader2 size={20} className="animate-spin" /> กำลังบันทึกข้อมูล...</span>
+                ) : (
+                  <>
+                    <Save size={20} /> ยืนยันการลงทะเบียน
+                  </>
+                )}
+              </button>
+            </form>
+          </div>
+        )}
+
+        {/* TAB 2: รายชื่อ (Registered List) */}
+        {activeTab === 'list' && (
+          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
+              <div className="flex items-center gap-3">
+                <h2 className="text-xl font-bold text-gray-800 flex items-center gap-2">
+                  <Users className="text-emerald-600" /> รายชื่อผู้ลงทะเบียน
+                </h2>
+              </div>
+              
+              <button
+                onClick={exportToCSV}
+                disabled={registeredList.length === 0}
+                className="w-full sm:w-auto bg-gray-800 hover:bg-gray-900 text-white text-sm font-medium py-2 px-4 rounded-lg flex items-center justify-center gap-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <Download size={16} /> โหลด Excel/CSV
+              </button>
+            </div>
+
+            {registeredList.length === 0 ? (
+              <div className="text-center py-16 text-gray-500 bg-gray-50 rounded-lg border border-dashed border-gray-300">
+                <Users size={48} className="mx-auto text-gray-300 mb-4" />
+                <p className="font-medium">ยังไม่มีผู้ลงทะเบียนในขณะนี้</p>
+              </div>
+            ) : (
+              <div className="overflow-x-auto rounded-lg border border-gray-200">
+                <table className="w-full text-sm text-left text-gray-500 whitespace-nowrap">
+                  <thead className="text-xs text-gray-700 uppercase bg-gray-50 border-b border-gray-200">
+                    <tr>
+                      <th className="px-4 py-3">ลำดับ</th>
+                      <th className="px-4 py-3">เวลาที่ลงทะเบียน</th>
+                      <th className="px-4 py-3">รหัส</th>
+                      <th className="px-4 py-3">ชื่อ-นามสกุล</th>
+                      <th className="px-4 py-3">ห้องเรียน</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {registeredList.map((user, index) => (
+                      <tr key={index} className="bg-white border-b hover:bg-gray-50 transition-colors">
+                        <td className="px-4 py-3 font-medium text-gray-900">{registeredList.length - index}</td>
+                        <td className="px-4 py-3 text-xs">{user.timestamp}</td>
+                        <td className="px-4 py-3 font-mono">{user.studentId}</td>
+                        <td className="px-4 py-3 font-medium text-gray-900">{user.fullName}</td>
+                        <td className="px-4 py-3">
+                          <span className="bg-blue-50 text-blue-700 px-2 py-1 rounded-md text-xs border border-blue-100">
+                            {user.room}
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* TAB 3: ตั้งค่า (Settings) */}
+        {activeTab === 'settings' && (
+          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+            <h2 className="text-xl font-bold text-gray-800 mb-6 flex items-center gap-2">
+              <Settings className="text-emerald-600" /> ตั้งค่าโครงการ
+            </h2>
+
+            <div className="space-y-6">
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-1">ชื่อโครงการ</label>
+                <input
+                  type="text"
+                  value={projectSettings.title}
+                  onChange={(e) => setProjectSettings({...projectSettings, title: e.target.value})}
+                  className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none"
+                />
+              </div>
+              
+              <div>
+                <div className="flex justify-between items-end mb-1">
+                  <label className="block text-sm font-semibold text-gray-700">รายละเอียดโครงการ</label>
+                </div>
+                <textarea
+                  value={projectSettings.description}
+                  onChange={(e) => setProjectSettings({...projectSettings, description: e.target.value})}
+                  rows="3"
+                  className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none leading-relaxed"
+                />
+                
+                {/* AI Description Generator Feature */}
+                <div className="mt-3 p-4 bg-gradient-to-br from-indigo-50 to-purple-50 rounded-lg border border-indigo-100">
+                  <label className="flex items-center gap-2 text-sm font-bold text-indigo-900 mb-2">
+                    <Sparkles size={16} className="text-indigo-500" /> ผู้ช่วย AI ร่างรายละเอียด
+                  </label>
+                  <p className="text-xs text-indigo-700 mb-3">พิมพ์หัวข้อคร่าวๆ ที่ต้องการ แล้วให้ AI ช่วยร่างข้อความที่สละสลวยให้คุณ</p>
+                  
+                  <div className="flex flex-col sm:flex-row gap-2">
+                    <input
+                      type="text"
+                      value={aiTopic}
+                      onChange={(e) => setAiTopic(e.target.value)}
+                      placeholder="เช่น เน้นมารยาทในการละหมาด หรือ การอาบน้ำละหมาดที่ถูกต้อง..."
+                      className="flex-1 p-2.5 text-sm border border-indigo-200 rounded-md focus:ring-2 focus:ring-indigo-400 outline-none"
+                      disabled={isGeneratingDesc}
+                    />
+                    <button
+                      onClick={handleGenerateDescription}
+                      disabled={isGeneratingDesc}
+                      className="bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium py-2.5 px-4 rounded-md transition-colors disabled:opacity-50 flex justify-center items-center gap-1 whitespace-nowrap shadow-sm"
+                    >
+                      {isGeneratingDesc ? (
+                        <><Loader2 size={16} className="animate-spin" /> กำลังประมวลผล...</>
+                      ) : (
+                        <>✨ ร่างข้อความด้วย AI</>
+                      )}
+                    </button>
+                  </div>
+                  {descAiError && (
+                    <p className="text-red-500 text-xs mt-2 font-medium">{descAiError}</p>
+                  )}
+                </div>
+              </div>
+
+              <div className="pt-6 border-t border-gray-200">
+                <label className="block text-sm font-semibold text-gray-700 mb-1 flex items-center gap-2">
+                  การเชื่อมต่อฐานข้อมูล (Google Apps Script URL)
+                </label>
+                <p className="text-xs text-gray-500 mb-3">
+                  นำ URL ที่ได้จากขั้นตอนการทำ Google Sheet มาวางที่นี่เพื่อให้ระบบส่งข้อมูลจริง
+                </p>
+                <input
+                  type="text"
+                  value={projectSettings.googleScriptUrl}
+                  onChange={(e) => setProjectSettings({...projectSettings, googleScriptUrl: e.target.value})}
+                  placeholder="https://script.google.com/macros/s/AKfycb.../exec"
+                  className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none font-mono text-sm bg-gray-50"
+                />
+              </div>
+            </div>
+          </div>
+        )}
+      </main>
+    </div>
+  );
+}
