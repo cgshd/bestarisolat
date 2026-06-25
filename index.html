@@ -5,8 +5,33 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>ระบบลงทะเบียนโครงการ - Bestari Sholat</title>
     
-    <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <style> body { font-family: 'Sarabun', sans-serif; } </style>
+    <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body { 
+            font-family: 'Sarabun', 'Outfit', sans-serif; 
+        }
+        @keyframes fadeIn {
+          from { opacity: 0; transform: translateY(10px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+        @keyframes scaleUp {
+          from { opacity: 0; transform: scale(0.97); }
+          to { opacity: 1; transform: scale(1); }
+        }
+        .animate-fadeIn {
+          animation: fadeIn 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+        }
+        .animate-scaleUp {
+          animation: scaleUp 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+        }
+        /* ลายประดับอิสลามิก (Islamic Geometric Ornament CSS pattern) */
+        .islamic-pattern {
+            background-color: #047857;
+            background-image: radial-gradient(rgba(217, 119, 6, 0.15) 1px, transparent 0), radial-gradient(rgba(217, 119, 6, 0.15) 1px, transparent 0);
+            background-size: 20px 20px;
+            background-position: 0 0, 10px 10px;
+        }
+    </style>
 
     <script src="https://cdn.tailwindcss.com"></script>
 
@@ -23,16 +48,16 @@
 
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 </head>
-<body class="bg-gray-50">
+<body class="bg-slate-50/50">
     <div id="root"></div>
 
     <script type="text/babel" data-type="module">
         // 1. นำเข้า React และไลบรารีต่างๆ
         import React, { useState, useEffect } from 'react';
         import { createRoot } from 'react-dom/client';
-        import { Settings, Users, ClipboardList, CheckCircle2, Search, Save, AlertCircle, Download, Sparkles, Loader2, MessageSquareHeart, Lock, Unlock, Upload, FileSpreadsheet, Trash2, RefreshCw, User } from 'lucide-react';
+        import { Settings, Users, ClipboardList, CheckCircle2, Search, Save, AlertCircle, Download, Sparkles, Loader2, MessageSquareHeart, Lock, Unlock, Upload, FileSpreadsheet, Trash2, RefreshCw, User, Plus, Edit2, Trash, X } from 'lucide-react';
 
-        // 2. ข้อมูลจำลองตั้งต้นจากระบบ (สำหรับกรณีเชื่อมต่อ Google Sheets ไม่สำเร็จ)
+        // 2. ข้อมูลจำลองตั้งต้นจากระบบ
         const defaultStudentData = [
           { id: '26858', title: 'เด็กชาย', firstName: 'อัซรี', lastName: 'เตะ', room: 'ม.1 Berdikari' },
           { id: '26906', title: 'เด็กชาย', firstName: 'ชารีฟ', lastName: 'ตีมุง', room: 'ม.1 Berdikari' },
@@ -51,12 +76,12 @@
             title: 'Bestari Sholat Kali Ke-2',
             description: 'โครงการอบรมและทดสอบการปฏิบัติศาสนกิจ (ละหมาด) สำหรับนักเรียน',
             date: '2026-07-15',
-            googleScriptUrl: 'https://script.google.com/macros/s/AKfycbwoE_DRewCKTouoFuAUoX_lQU-ZqsQa2t2tqGxV4BZ5RHkqpnOg4G8LHMHkszOUm0x2/exec' // ใส่ค่าเริ่มต้นตามที่ส่งมา
+            googleScriptUrl: 'https://script.google.com/macros/s/AKfycbwoE_DRewCKTouoFuAUoX_lQU-ZqsQa2t2tqGxV4BZ5RHkqpnOg4G8LHMHkszOUm0x2/exec'
           });
 
           // ระบบฐานข้อมูลนักเรียน
           const [studentDb, setStudentDb] = useState([]);
-          const [dbSource, setDbSource] = useState('loading'); // 'loading', 'sheet', 'local', 'default'
+          const [dbSource, setDbSource] = useState('loading');
           const [isLoadingDb, setIsLoadingDb] = useState(false);
           const [dbError, setDbError] = useState('');
 
@@ -65,78 +90,133 @@
           const [passwordInput, setPasswordInput] = useState('');
           const [passwordError, setPasswordError] = useState('');
 
+          // โลโก้ระบบ
+          const [systemLogo, setSystemLogo] = useState('');
+
+          // รายชื่อผู้ลงทะเบียน (สำหรับ CRUD)
+          const [registeredList, setRegisteredList] = useState([]);
+          const [isLoadingRegs, setIsLoadingRegs] = useState(false);
+
+          // การกรอกฟอร์มลงทะเบียนหลัก
           const [searchId, setSearchId] = useState('');
           const [studentInfo, setStudentInfo] = useState(null);
           const [isSubmitting, setIsSubmitting] = useState(false);
           const [submitStatus, setSubmitStatus] = useState(null);
-          const [registeredList, setRegisteredList] = useState([]);
 
+          // รหัส AI และข้อความตอบรับ
           const [aiTopic, setAiTopic] = useState('');
           const [isGeneratingDesc, setIsGeneratingDesc] = useState(false);
           const [descAiError, setDescAiError] = useState('');
-          
           const [aiWelcomeMessage, setAiWelcomeMessage] = useState('');
           const [isGeneratingWelcome, setIsGeneratingWelcome] = useState(false);
           const [registeredName, setRegisteredName] = useState('');
 
+          // อัปโหลดข้อมูล CSV
           const [uploadError, setUploadError] = useState('');
           const [uploadSuccess, setUploadSuccess] = useState('');
           const [isUploadingDb, setIsUploadingDb] = useState(false);
-          
-          // เก็บสถานะโหลดรูปภาพผิดพลาด
           const [imgError, setImgError] = useState(false);
 
-          // ฟังก์ชันดึงข้อมูลนักเรียนจาก Google Sheet
-          const fetchDatabaseFromSheet = async (url) => {
-            if (!url) {
+          // สถานะ Modals จัดการข้อมูล (CRUD)
+          const [isCreateOpen, setIsCreateOpen] = useState(false);
+          const [isEditOpen, setIsEditOpen] = useState(false);
+          const [editingRecord, setEditingRecord] = useState(null);
+          const [isDeleteOpen, setIsDeleteOpen] = useState(false);
+          const [deletingRecord, setDeletingRecord] = useState(null);
+
+          // ฟิลด์ข้อมูลของ Modals
+          const [modalStudentId, setModalStudentId] = useState('');
+          const [modalFullName, setModalFullName] = useState('');
+          const [modalRoom, setModalRoom] = useState('');
+          const [modalTimestamp, setModalTimestamp] = useState('');
+          const [modalError, setModalError] = useState('');
+          const [isModalSubmitting, setIsModalSubmitting] = useState(false);
+
+          // โหลดข้อมูลเริ่มต้น
+          useEffect(() => {
+            // 1. โหลดโลโก้ระบบ
+            const savedLogo = localStorage.getItem('system_logo');
+            if (savedLogo) setSystemLogo(savedLogo);
+
+            // 2. โหลดฐานข้อมูลนักเรียนสำรอง
+            const savedDb = localStorage.getItem('student_database');
+            if (savedDb) {
+              try {
+                const parsed = JSON.parse(savedDb);
+                if (Array.isArray(parsed) && parsed.length > 0) {
+                  setStudentDb(parsed);
+                  setDbSource('local');
+                } else {
+                  setStudentDb(defaultStudentData);
+                  setDbSource('default');
+                }
+              } catch (e) {
+                setStudentDb(defaultStudentData);
+                setDbSource('default');
+              }
+            } else {
               setStudentDb(defaultStudentData);
               setDbSource('default');
-              return;
             }
+
+            // 3. โหลดประวัติผู้ลงทะเบียน
+            const savedRegs = localStorage.getItem('registrations');
+            if (savedRegs) {
+              try {
+                setRegisteredList(JSON.parse(savedRegs));
+              } catch(e) {}
+            }
+          }, []);
+
+          // ดึงข้อมูลนักเรียนจาก Google Sheet
+          const fetchDatabaseFromSheet = async (url) => {
+            if (!url) return;
             setIsLoadingDb(true);
             setDbError('');
             try {
-              // ดึงข้อมูลผ่าน action=getStudents
               const res = await fetch(`${url}?action=getStudents`);
-              if (!res.ok) throw new Error('เครือข่ายตอบสนองไม่ปกติ');
+              if (!res.ok) throw new Error('การเชื่อมต่อกับสคริปต์ทำงานผิดพลาด');
               const data = await res.json();
-              
               if (Array.isArray(data) && data.length > 0) {
                 setStudentDb(data);
                 setDbSource('sheet');
-                setDbError('');
-                // บันทึกสำรองข้อมูลล่าสุดในเครื่องด้วย
                 localStorage.setItem('student_database', JSON.stringify(data));
               } else {
-                throw new Error('โครงสร้างข้อมูลในชีทไม่ถูกต้อง หรือไม่มีข้อมูลนักเรียน');
+                throw new Error('โครงสร้างไฟล์นักเรียนใน Google Sheet ไม่ถูกต้อง');
               }
             } catch (err) {
-              console.error("Error fetching database from Sheet:", err);
-              setDbError('เชื่อมต่อ Google Sheet ล้มเหลว จะใช้ฐานข้อมูลสำรองในเครื่องแทน');
-              
-              // โหลดจาก Local Storage สำรอง
-              const savedDb = localStorage.getItem('student_database');
-              if (savedDb) {
-                try {
-                  const parsed = JSON.parse(savedDb);
-                  if (Array.isArray(parsed) && parsed.length > 0) {
-                    setStudentDb(parsed);
-                    setDbSource('local');
-                    return;
-                  }
-                } catch(e) {}
-              }
-              // ถ้าไม่มีอะไรเลย ใช้ default ดั้งเดิม
-              setStudentDb(defaultStudentData);
-              setDbSource('default');
+              console.error(err);
+              setDbError('ดึงฐานข้อมูลจาก Google Sheets ล้มเหลว (ใช้ข้อมูลสำรองชั่วคราว)');
             } finally {
               setIsLoadingDb(false);
             }
           };
 
-          // โหลดข้อมูลนักเรียนเมื่อเข้าใช้งานและเมื่อ Google Apps Script URL เปลี่ยนแปลง
+          // ดึงรายชื่อผู้ลงทะเบียนจาก Google Sheet
+          const fetchRegistrationsFromSheet = async (url) => {
+            if (!url) return;
+            setIsLoadingRegs(true);
+            try {
+              const res = await fetch(`${url}?action=getRegistrations`);
+              if (!res.ok) throw new Error('ดึงข้อมูลผู้ลงทะเบียนล้มเหลว');
+              const data = await res.json();
+              if (Array.isArray(data)) {
+                setRegisteredList(data);
+                localStorage.setItem('registrations', JSON.stringify(data));
+              }
+            } catch (err) {
+              console.error(err);
+            } finally {
+              setIsLoadingRegs(false);
+            }
+          };
+
+          // โหลดข้อมูลเมื่อ URL มีการเปลี่ยนแปลง
           useEffect(() => {
-            fetchDatabaseFromSheet(projectSettings.googleScriptUrl);
+            if (projectSettings.googleScriptUrl) {
+              fetchDatabaseFromSheet(projectSettings.googleScriptUrl);
+              fetchRegistrationsFromSheet(projectSettings.googleScriptUrl);
+            }
           }, [projectSettings.googleScriptUrl]);
 
           const callGeminiAPI = async (prompt) => {
@@ -206,65 +286,7 @@
             }
           };
 
-          const exportToCSV = () => {
-            if (registeredList.length === 0) return;
-            const BOM = '\uFEFF';
-            const headers = ['ลำดับ', 'วัน-เวลาที่ลงทะเบียน', 'รหัสนักเรียน', 'ชื่อ-นามสกุล', 'ห้องเรียน', 'ชื่อโครงการ'];
-            const csvContent = registeredList.map((user, index) => {
-              return [
-                registeredList.length - index,
-                `"${user.timestamp}"`,
-                `"${user.studentId}"`,
-                `"${user.fullName}"`,
-                `"${user.room}"`,
-                `"${user.projectTitle}"`
-              ].join(',');
-            });
-            const csvData = BOM + headers.join(',') + '\n' + csvContent.join('\n');
-            const blob = new Blob([csvData], { type: 'text/csv;charset=utf-8;' });
-            const url = URL.createObjectURL(blob);
-            const link = document.createElement('a');
-            link.href = url;
-            link.setAttribute('download', `ข้อมูลลงทะเบียน_${projectSettings.title.replace(/\s+/g, '_')}.csv`);
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
-          };
-
-          // ฟังก์ชันตรวจสอบรหัสผ่าน
-          const handlePasswordSubmit = (e) => {
-            e.preventDefault();
-            if (passwordInput === 'aaaaaa') {
-              setIsUnlocked(true);
-              setPasswordError('');
-            } else {
-              setPasswordError('รหัสผ่านไม่ถูกต้อง กรุณาลองใหม่อีกครั้ง');
-              setPasswordInput('');
-            }
-          };
-
-          // ฟังก์ชันล็อคหน้าตั้งค่าใหม่
-          const handleLockSettings = () => {
-            setIsUnlocked(false);
-            setPasswordInput('');
-            setPasswordError('');
-          };
-
-          // ดาวน์โหลดเทมเพลต CSV
-          const downloadTemplate = () => {
-            const BOM = '\uFEFF';
-            const csvContent = "id,title,firstName,lastName,room\n26858,เด็กชาย,อัซรี,เตะ,ม.1 Berdikari\n26906,เด็กชาย,ชารีฟ,ตีมุง,ม.1 Berdikari\n26913,เด็กชาย,อัซวาน,มะแซ,ม.1 Berdikari\n26920,เด็กชาย,นัสรุดดีน,สุหลง,ม.1 Amanah";
-            const blob = new Blob([BOM + csvContent], { type: 'text/csv;charset=utf-8;' });
-            const url = URL.createObjectURL(blob);
-            const link = document.createElement('a');
-            link.href = url;
-            link.setAttribute('download', 'template_student_database.csv');
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
-          };
-
-          // ฟังก์ชันนำเข้า CSV และส่งข้อมูลอัปโหลดไปบันทึกยัง Google Sheets (ฟีเจอร์ใหม่)
+          // ฟังก์ชันนำเข้าและอัปเดตไฟล์ CSV
           const handleCsvUpload = (e) => {
             const file = e.target.files[0];
             if (!file) return;
@@ -284,7 +306,6 @@
                 const headers = lines[0].split(',').map(h => h.trim().replace(/^["']|["']$/g, ''));
                 const requiredHeaders = ['id', 'title', 'firstName', 'lastName', 'room'];
                 
-                // ตรวจสอบคอลัมน์
                 const isHeaderValid = requiredHeaders.every(h => headers.includes(h));
                 if (!isHeaderValid) {
                   throw new Error('รูปแบบคอลัมน์ไม่ถูกต้อง กรุณาใช้เทมเพลตที่ดาวน์โหลดจากระบบ');
@@ -334,14 +355,12 @@
                   throw new Error('ไม่พบข้อมูลนักเรียนที่สมบูรณ์ในไฟล์นี้');
                 }
 
-                // เริ่มส่งข้อมูลขึ้น Google Sheets
                 if (projectSettings.googleScriptUrl) {
                   setIsUploadingDb(true);
                   
-                  // ส่ง POST ไปยัง Google Apps Script เพื่อบันทึกฐานข้อมูลลง Google Sheet
                   await fetch(projectSettings.googleScriptUrl, {
                     method: 'POST',
-                    mode: 'no-cors', // ใช้ no-cors เนื่องจากเป็น App Script Redirect
+                    mode: 'no-cors',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                       action: 'uploadDatabase',
@@ -349,7 +368,6 @@
                     })
                   });
 
-                  // บันทึกสำรองใน Local Storage
                   localStorage.setItem('student_database', JSON.stringify(parsedStudents));
                   setStudentDb(parsedStudents);
                   setDbSource('sheet');
@@ -368,7 +386,27 @@
             e.target.value = '';
           };
 
-          // ลบฐานข้อมูลที่อัปโหลดและดึงใหม่
+          // จัดการการอัปโหลดโลโก้ระบบ
+          const handleLogoUpload = (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = (event) => {
+              const base64Data = event.target.result;
+              setSystemLogo(base64Data);
+              localStorage.setItem('system_logo', base64Data);
+            };
+            reader.readAsDataURL(file);
+          };
+
+          // ลบโลโก้ระบบ
+          const handleResetLogo = () => {
+            setSystemLogo('');
+            localStorage.removeItem('system_logo');
+          };
+
+          // ล้างฐานข้อมูลและดึงใหม่
           const handleResetToDefault = () => {
             if (confirm('คุณต้องการล้างข้อมูลแคชสำรองและดึงข้อมูลใหม่จาก Google Sheets หรือไม่?')) {
               localStorage.removeItem('student_database');
@@ -392,6 +430,7 @@
             }
           }, [searchId, studentDb]);
 
+          // ฟังก์ชันสมัครลงทะเบียนจากฟอร์มหลัก
           const handleRegister = async (e) => {
             e.preventDefault();
             if (!studentInfo) return;
@@ -400,7 +439,7 @@
             setAiWelcomeMessage('');
             const fullName = `${studentInfo.title || ''}${studentInfo.firstName} ${studentInfo.lastName}`;
             const dataToSubmit = {
-              action: 'register', // ระบุแอคชั่นเพื่อให้ระบบแยกแยะได้
+              action: 'register',
               timestamp: new Date().toLocaleString('th-TH'),
               studentId: studentInfo.id,
               fullName: fullName,
@@ -408,7 +447,6 @@
               projectTitle: projectSettings.title
             };
             try {
-              setRegisteredList([dataToSubmit, ...registeredList]);
               if (projectSettings.googleScriptUrl) {
                 await fetch(projectSettings.googleScriptUrl, {
                   method: 'POST',
@@ -416,8 +454,11 @@
                   headers: { 'Content-Type': 'application/json' },
                   body: JSON.stringify(dataToSubmit)
                 });
+                // รีเฟรชข้อมูลตาราง
+                fetchRegistrationsFromSheet(projectSettings.googleScriptUrl);
               } else {
                 await new Promise(resolve => setTimeout(resolve, 800));
+                setRegisteredList([dataToSubmit, ...registeredList]);
               }
               setSubmitStatus('success');
               setRegisteredName(studentInfo.firstName);
@@ -433,25 +474,252 @@
             }
           };
 
+          // ==========================================
+          // ระบบ CRUD สำหรับตารางผู้ลงทะเบียน
+          // ==========================================
+
+          // เปิด Modal เพิ่มข้อมูล (C)
+          const openCreateModal = () => {
+            setModalStudentId('');
+            setModalFullName('');
+            setModalRoom('');
+            setModalError('');
+            setIsCreateOpen(true);
+          };
+
+          // ยืนยันการเพิ่มข้อมูล (C)
+          const handleCreateConfirm = async (e) => {
+            e.preventDefault();
+            if (!modalStudentId.trim() || !modalFullName.trim() || !modalRoom.trim()) {
+              setModalError('กรุณากรอกข้อมูลให้ครบถ้วนทุกช่อง');
+              return;
+            }
+            setIsModalSubmitting(true);
+            setModalError('');
+            
+            const timestamp = new Date().toLocaleString('th-TH');
+            const dataToSubmit = {
+              action: 'createRegistration',
+              timestamp: timestamp,
+              studentId: modalStudentId.trim(),
+              fullName: modalFullName.trim(),
+              room: modalRoom.trim(),
+              projectTitle: projectSettings.title
+            };
+
+            try {
+              if (projectSettings.googleScriptUrl) {
+                await fetch(projectSettings.googleScriptUrl, {
+                  method: 'POST',
+                  mode: 'no-cors',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify(dataToSubmit)
+                });
+                // โหลดตารางใหม่จากคลาวด์
+                await fetchRegistrationsFromSheet(projectSettings.googleScriptUrl);
+              } else {
+                const newList = [dataToSubmit, ...registeredList];
+                setRegisteredList(newList);
+                localStorage.setItem('registrations', JSON.stringify(newList));
+              }
+              setIsCreateOpen(false);
+            } catch (err) {
+              console.error(err);
+              setModalError('เกิดข้อผิดพลาดในการบันทึกข้อมูล กรุณาลองใหม่อีกครั้ง');
+            } finally {
+              setIsModalSubmitting(false);
+            }
+          };
+
+          // เปิด Modal แก้ไขข้อมูล (U)
+          const openEditModal = (record) => {
+            setEditingRecord(record);
+            setModalStudentId(record.studentId);
+            setModalFullName(record.fullName);
+            setModalRoom(record.room);
+            setModalTimestamp(record.timestamp);
+            setModalError('');
+            setIsEditOpen(true);
+          };
+
+          // ยืนยันการอัปเดตข้อมูล (U)
+          const handleEditConfirm = async (e) => {
+            e.preventDefault();
+            if (!modalFullName.trim() || !modalRoom.trim()) {
+              setModalError('กรุณากรอกชื่อและห้องเรียนให้ครบถ้วน');
+              return;
+            }
+            setIsModalSubmitting(true);
+            setModalError('');
+
+            const dataToSubmit = {
+              action: 'updateRegistration',
+              oldTimestamp: editingRecord.timestamp,
+              oldStudentId: editingRecord.studentId,
+              newData: {
+                timestamp: modalTimestamp,
+                studentId: modalStudentId,
+                fullName: modalFullName.trim(),
+                room: modalRoom.trim(),
+                projectTitle: projectSettings.title
+              }
+            };
+
+            try {
+              if (projectSettings.googleScriptUrl) {
+                await fetch(projectSettings.googleScriptUrl, {
+                  method: 'POST',
+                  mode: 'no-cors',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify(dataToSubmit)
+                });
+                await fetchRegistrationsFromSheet(projectSettings.googleScriptUrl);
+              } else {
+                const updatedList = registeredList.map(item => 
+                  (item.timestamp === editingRecord.timestamp && item.studentId === editingRecord.studentId)
+                  ? dataToSubmit.newData
+                  : item
+                );
+                setRegisteredList(updatedList);
+                localStorage.setItem('registrations', JSON.stringify(updatedList));
+              }
+              setIsEditOpen(false);
+              setEditingRecord(null);
+            } catch (err) {
+              console.error(err);
+              setModalError('เกิดข้อผิดพลาดในการเชื่อมต่ออัปเดตข้อมูล');
+            } finally {
+              setIsModalSubmitting(false);
+            }
+          };
+
+          // เปิด Modal ยืนยันการลบข้อมูล (D)
+          const openDeleteModal = (record) => {
+            setDeletingRecord(record);
+            setIsDeleteOpen(true);
+          };
+
+          // ยืนยันการลบ (D)
+          const handleDeleteConfirm = async () => {
+            if (!deletingRecord) return;
+            setIsModalSubmitting(true);
+            
+            const dataToSubmit = {
+              action: 'deleteRegistration',
+              timestamp: deletingRecord.timestamp,
+              studentId: deletingRecord.studentId
+            };
+
+            try {
+              if (projectSettings.googleScriptUrl) {
+                await fetch(projectSettings.googleScriptUrl, {
+                  method: 'POST',
+                  mode: 'no-cors',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify(dataToSubmit)
+                });
+                await fetchRegistrationsFromSheet(projectSettings.googleScriptUrl);
+              } else {
+                const updatedList = registeredList.filter(item => 
+                  !(item.timestamp === deletingRecord.timestamp && item.studentId === deletingRecord.studentId)
+                );
+                setRegisteredList(updatedList);
+                localStorage.setItem('registrations', JSON.stringify(updatedList));
+              }
+              setIsDeleteOpen(false);
+              setDeletingRecord(null);
+            } catch (err) {
+              console.error(err);
+              alert('ไม่สามารถลบข้อมูลจาก Google Sheets ได้ กรุณาลองใหม่อีกครั้ง');
+            } finally {
+              setIsModalSubmitting(false);
+            }
+          };
+
+          // ฟังก์ชันล็อกอิน
+          const handlePasswordSubmit = (e) => {
+            e.preventDefault();
+            if (passwordInput === 'aaaaaa') {
+              setIsUnlocked(true);
+              setPasswordError('');
+            } else {
+              setPasswordError('รหัสผ่านไม่ถูกต้อง กรุณาลองใหม่อีกครั้ง');
+              setPasswordInput('');
+            }
+          };
+
+          const handleLockSettings = () => {
+            setIsUnlocked(false);
+            setPasswordInput('');
+            setPasswordError('');
+          };
+
+          const downloadTemplate = () => {
+            const BOM = '\uFEFF';
+            const csvContent = "id,title,firstName,lastName,room\n26858,เด็กชาย,อัซรี,เตะ,ม.1 Berdikari\n26906,เด็กชาย,ชารีฟ,ตีมุง,ม.1 Berdikari";
+            const blob = new Blob([BOM + csvContent], { type: 'text/csv;charset=utf-8;' });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.setAttribute('download', 'template_student_database.csv');
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+          };
+
+          const exportToCSV = () => {
+            const BOM = '\uFEFF';
+            let csvContent = "วันเวลาที่สมัคร,รหัสนักเรียน,ชื่อ-นามสกุล,ห้องเรียน,ชื่อโครงการ\n";
+            registeredList.forEach(user => {
+              csvContent += `"${user.timestamp || ''}","${user.studentId || ''}","${user.fullName || ''}","${user.room || ''}","${user.projectTitle || ''}"\n`;
+            });
+            const blob = new Blob([BOM + csvContent], { type: 'text/csv;charset=utf-8;' });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.setAttribute('download', 'registered_students.csv');
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+          };
+
           return (
-            <div className="min-h-screen text-gray-800 font-sans">
-              <header className="bg-emerald-700 text-white shadow-md p-6">
-                <div className="max-w-4xl mx-auto flex flex-col md:flex-row justify-between items-center gap-4">
-                  <div>
-                    <h1 className="text-2xl font-bold">{projectSettings.title}</h1>
-                    <p className="text-emerald-100 text-sm mt-1">{projectSettings.description}</p>
+            <div className="min-h-screen text-slate-800 font-sans pb-16">
+              {/* ส่วนหัวแบบอิสลามิกร่วมสมัย (Modern Islamic Header Banner) */}
+              <header className="islamic-pattern text-white shadow-lg relative overflow-hidden border-b-4 border-amber-600">
+                {/* ลายเส้นทองและแสงละมุน */}
+                <div className="absolute inset-0 bg-gradient-to-r from-emerald-950/70 via-emerald-800/70 to-teal-950/70 z-0"></div>
+                <div className="max-w-4xl mx-auto flex flex-col md:flex-row justify-between items-center gap-6 p-8 relative z-10">
+                  <div className="flex items-center gap-4 text-center md:text-left flex-col md:flex-row">
+                    {/* โลโก้ของระบบ */}
+                    {systemLogo ? (
+                      <img src={systemLogo} className="w-16 h-16 object-cover rounded-2xl bg-white p-1 border-2 border-amber-500/50 shadow-md" alt="โลโก้ระบบ" />
+                    ) : (
+                      /* โลโก้เริ่มต้น มัสยิดลายเส้นทองเหลือง */
+                      <div className="w-16 h-16 rounded-2xl bg-emerald-800/80 border-2 border-amber-500 flex items-center justify-center text-amber-500 shadow-md">
+                        <svg className="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M12 2.25c-5.385 0-9.75 4.365-9.75 9.75s4.365 9.75 9.75 9.75 9.75-4.365 9.75-9.75S17.385 2.25 12 2.25zM12 6a3.75 3.75 0 100 7.5A3.75 3.75 0 0012 6z" />
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M12 18.75v-3m-3.75 3h7.5" />
+                        </svg>
+                      </div>
+                    )}
+                    <div>
+                      <h1 className="text-2xl font-bold font-serif text-amber-500 tracking-wide">{projectSettings.title}</h1>
+                      <p className="text-emerald-100/90 text-sm mt-1 font-light leading-relaxed max-w-xl">{projectSettings.description}</p>
+                    </div>
                   </div>
-                  <div className="bg-emerald-800 px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap">
-                    ลงทะเบียนแล้ว: {registeredList.length} คน
+                  <div className="bg-emerald-950/70 border border-amber-500/30 px-5 py-3 rounded-2xl text-center shadow-inner">
+                    <p className="text-xs text-emerald-300 font-medium">ลงทะเบียนสำเร็จ</p>
+                    <p className="text-2xl font-bold text-amber-500 tracking-tight">{registeredList.length} <span className="text-xs text-white font-normal">คน</span></p>
                   </div>
                 </div>
               </header>
 
-              {/* แสดงสถานะการโหลดฐานข้อมูลจาก Google Sheets */}
+              {/* สถานะโหลด/แจ้งเตือน */}
               {isLoadingDb && (
-                <div className="bg-amber-50 text-amber-700 text-xs font-semibold text-center py-2 flex items-center justify-center gap-2 border-b border-amber-100">
+                <div className="bg-amber-50 text-amber-800 text-xs font-semibold text-center py-2 flex items-center justify-center gap-2 border-b border-amber-100">
                   <Loader2 className="animate-spin" size={14} /> 
-                  <span>กำลังดึงข้อมูลนักเรียนจาก Google Sheet...</span>
+                  <span>กำลังดึงข้อมูลนักเรียนจาก Google Sheets เพื่ออัปเดตระบบ...</span>
                 </div>
               )}
               {dbError && (
@@ -459,219 +727,227 @@
                   <AlertCircle size={14} />
                   <span>{dbError}</span>
                   <button onClick={() => fetchDatabaseFromSheet(projectSettings.googleScriptUrl)} className="underline hover:text-red-900 flex items-center gap-0.5">
-                    <RefreshCw size={10} /> ลองใหม่
+                    <RefreshCw size={10} /> รีโหลดใหม่
                   </button>
                 </div>
               )}
 
-              <div className="max-w-4xl mx-auto mt-6 px-4">
-                <div className="flex bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+              {/* แถบเมนูด้านบน */}
+              <div className="max-w-4xl mx-auto mt-8 px-4">
+                <div className="flex bg-white rounded-2xl shadow-sm border border-slate-200/80 p-1.5 overflow-hidden">
                   <button onClick={() => { setActiveTab('register'); setSubmitStatus(null); setAiWelcomeMessage(''); }}
-                    className={`flex-1 py-3 px-2 sm:px-4 flex items-center justify-center gap-2 font-medium transition-colors ${activeTab === 'register' ? 'bg-emerald-50 text-emerald-700 border-b-2 border-emerald-600' : 'text-gray-500 hover:bg-gray-50'}`}>
+                    className={`flex-1 py-3 px-4 flex items-center justify-center gap-2 font-bold text-sm rounded-xl transition-all ${activeTab === 'register' ? 'bg-emerald-700 text-white shadow-md shadow-emerald-700/25' : 'text-slate-500 hover:text-slate-800 hover:bg-slate-50'}`}>
                     <ClipboardList size={18} />
-                    <span className="hidden sm:inline">ลงทะเบียน</span>
+                    <span>ลงทะเบียน</span>
                   </button>
                   <button onClick={() => setActiveTab('list')}
-                    className={`flex-1 py-3 px-2 sm:px-4 flex items-center justify-center gap-2 font-medium transition-colors ${activeTab === 'list' ? 'bg-emerald-50 text-emerald-700 border-b-2 border-emerald-600' : 'text-gray-500 hover:bg-gray-50'}`}>
+                    className={`flex-1 py-3 px-4 flex items-center justify-center gap-2 font-bold text-sm rounded-xl transition-all ${activeTab === 'list' ? 'bg-emerald-700 text-white shadow-md shadow-emerald-700/25' : 'text-slate-500 hover:text-slate-800 hover:bg-slate-50'}`}>
                     <Users size={18} />
-                    <span className="hidden sm:inline">รายชื่อ</span>
+                    <span>รายชื่อผู้ลงทะเบียน</span>
                   </button>
                   <button onClick={() => setActiveTab('settings')}
-                    className={`flex-1 py-3 px-2 sm:px-4 flex items-center justify-center gap-2 font-medium transition-colors ${activeTab === 'settings' ? 'bg-emerald-50 text-emerald-700 border-b-2 border-emerald-600' : 'text-gray-500 hover:bg-gray-50'}`}>
+                    className={`flex-1 py-3 px-4 flex items-center justify-center gap-2 font-bold text-sm rounded-xl transition-all ${activeTab === 'settings' ? 'bg-emerald-700 text-white shadow-md shadow-emerald-700/25' : 'text-slate-500 hover:text-slate-800 hover:bg-slate-50'}`}>
                     <Settings size={18} />
-                    <span className="hidden sm:inline">ตั้งค่า & ฐานข้อมูล</span>
+                    <span>ระบบหลังบ้าน & โลโก้</span>
                   </button>
                 </div>
               </div>
 
-              <main className="max-w-4xl mx-auto mt-6 px-4 pb-12">
+              {/* ส่วนเนื้อหาหลัก */}
+              <main className="max-w-4xl mx-auto mt-6 px-4">
+                
+                {/* 1. แท็บหน้าลงทะเบียนหลัก */}
                 {activeTab === 'register' && (
-                  <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 md:p-8">
-                    <h2 className="text-xl font-bold text-gray-800 mb-6 flex items-center gap-2">
-                      <ClipboardList className="text-emerald-600" />
-                      ฟอร์มลงทะเบียนเข้าร่วมโครงการ
+                  <div className="bg-white rounded-3xl shadow-sm border border-slate-200/80 p-6 md:p-8 animate-fadeIn">
+                    <h2 className="text-xl font-bold text-emerald-800 mb-6 flex items-center gap-2.5 border-b border-slate-100 pb-3">
+                      <ClipboardList className="text-emerald-700" />
+                      ฟอร์มลงทะเบียนเข้าร่วมกิจกรรม
                     </h2>
 
                     {submitStatus === 'success' && (
-                      <div className="mb-6 bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-lg flex items-start sm:items-center gap-3">
-                        <CheckCircle2 size={24} className="text-green-500 mt-0.5 sm:mt-0 flex-shrink-0" />
+                      <div className="mb-6 bg-emerald-50 border border-emerald-200 text-emerald-800 px-4 py-3.5 rounded-2xl flex items-start sm:items-center gap-3">
+                        <CheckCircle2 size={24} className="text-emerald-600 mt-0.5 sm:mt-0 flex-shrink-0" />
                         <div>
-                          <p className="font-bold">ลงทะเบียนสำเร็จ!</p>
-                          <p className="text-sm">ระบบได้บันทึกข้อมูลของคุณเรียบร้อยแล้ว</p>
+                          <p className="font-bold">ลงทะเบียนสำเร็จ (อัลฮัมดูลิลลาฮ์)!</p>
+                          <p className="text-xs text-emerald-600">ข้อมูลการเข้าร่วมโครงการถูกบันทึกสำเร็จเรียบร้อยแล้ว</p>
                         </div>
                       </div>
                     )}
 
                     {(isGeneratingWelcome || aiWelcomeMessage) && (
-                      <div className="mb-6 p-5 rounded-xl border border-indigo-100 bg-gradient-to-r from-indigo-50 to-purple-50 text-indigo-900 shadow-sm transition-all">
+                      <div className="mb-6 p-5 rounded-2xl border border-amber-100 bg-gradient-to-r from-amber-50/50 to-emerald-50/50 text-slate-800 shadow-sm transition-all animate-scaleUp">
                         <div className="flex items-center gap-2 mb-2">
-                          <MessageSquareHeart size={20} className="text-indigo-500" />
-                          <h3 className="font-bold text-indigo-800 text-sm">ข้อความจากระบบ AI ถึง {registeredName}</h3>
+                          <MessageSquareHeart size={20} className="text-amber-600" />
+                          <h3 className="font-bold text-emerald-800 text-xs">ข้อความต้อนรับจาก AI ถึง {registeredName}</h3>
                         </div>
                         {isGeneratingWelcome ? (
-                          <div className="flex items-center gap-2 text-sm text-indigo-600 font-medium h-6">
-                            <Loader2 size={16} className="animate-spin" />
-                            กำลังสร้างข้อความอวยพร...
+                          <div className="flex items-center gap-2 text-xs text-slate-500 font-medium h-6">
+                            <Loader2 size={14} className="animate-spin text-emerald-700" />
+                            กำลังร่างข้อความต้อนรับและอวยพร...
                           </div>
                         ) : (
-                          <p className="text-sm leading-relaxed text-indigo-700 italic">"{aiWelcomeMessage}"</p>
+                          <p className="text-sm leading-relaxed text-emerald-800 italic font-medium">"{aiWelcomeMessage}"</p>
                         )}
                       </div>
                     )}
 
                     {submitStatus === 'error' && (
-                      <div className="mb-6 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg flex items-center gap-3">
+                      <div className="mb-6 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-2xl flex items-center gap-3">
                         <AlertCircle size={24} className="text-red-500" />
                         <div>
                           <p className="font-bold">เกิดข้อผิดพลาด!</p>
-                          <p className="text-sm">ไม่สามารถบันทึกข้อมูลได้ กรุณาลองใหม่อีกครั้ง</p>
+                          <p className="text-xs">ไม่สามารถเชื่อมต่อฐานข้อมูลได้ กรุณาลองใหม่อีกครั้ง</p>
                         </div>
                       </div>
                     )}
 
                     <form onSubmit={handleRegister} className="space-y-6">
                       <div>
-                        <label className="block text-sm font-semibold text-gray-700 mb-2">รหัสนักเรียน (5 หลัก)</label>
+                        <label className="block text-sm font-semibold text-slate-700 mb-2">ป้อนรหัสนักเรียน (5 หลัก)</label>
                         <div className="relative">
-                          <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                            <Search className="h-5 w-5 text-gray-400" />
+                          <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                            <Search className="h-5 w-5 text-slate-400" />
                           </div>
                           <input type="text"
                             value={searchId}
                             onChange={(e) => setSearchId(e.target.value.replace(/[^0-9]/g, '').slice(0, 5))}
-                            placeholder="พิมพ์รหัสนักเรียนเพื่อค้นหา..."
-                            className="pl-10 w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition-all text-lg"
+                            placeholder="พิมพ์รหัสนักเรียนเพื่อค้นหาข้อมูลอัตโนมัติ..."
+                            className="pl-11 w-full p-4 border border-slate-200 rounded-2xl focus:ring-2 focus:ring-emerald-600 focus:border-emerald-600 outline-none transition-all text-lg shadow-sm"
                             required />
                         </div>
-                        <p className="text-xs text-gray-500 mt-2">
-                          * ระบบจะค้นหาและดึงฐานข้อมูลจริงมาจาก Google Sheets (ทดลองพิมพ์ 26858 หรือ 26920)
+                        <p className="text-xs text-slate-500 mt-2">
+                          * ระบบจะค้นหาประวัติของคุณแบบอัตโนมัติ (ทดลองป้อน 26858 หรือ 26920)
                         </p>
                       </div>
 
                       {studentInfo && (
                         <div className="transition-all duration-350 animate-fadeIn">
                           {!studentInfo.isEditing ? (
-                            /* การ์ดแสดงข้อมูลนักเรียนพร้อมรูปจาก URL (ฟีเจอร์ใหม่) */
-                            <div className="bg-white p-6 rounded-2xl border border-gray-200 shadow-sm transition-all duration-300 hover:shadow-md md:flex md:items-center gap-6">
+                            /* การ์ดแสดงผลข้อมูลนักเรียนพร้อมรูปถ่ายแบบอิสลามิกทันสมัย */
+                            <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm transition-all duration-300 hover:shadow-md md:flex md:items-center gap-6 relative overflow-hidden">
+                              {/* ลายขอบตกแต่งด้านขวา */}
+                              <div className="absolute right-0 top-0 bottom-0 w-1 bg-gradient-to-b from-emerald-600 via-amber-500 to-emerald-700"></div>
+                              
                               {/* รูปนักเรียน */}
                               <div className="flex-shrink-0 flex justify-center mb-4 md:mb-0">
                                 {imgError ? (
-                                  <div className="w-24 h-24 md:w-28 md:h-28 rounded-2xl bg-emerald-50 flex flex-col items-center justify-center text-emerald-600 shadow-inner border-2 border-emerald-100 ring-4 ring-emerald-500/5">
-                                    <User size={40} className="text-emerald-500" />
-                                    <span className="text-[10px] font-bold text-emerald-400 mt-1">ไม่มีรูป</span>
+                                  <div className="w-24 h-24 md:w-28 md:h-28 rounded-2xl bg-emerald-50/50 flex flex-col items-center justify-center text-emerald-700 shadow-inner border border-emerald-100 ring-4 ring-emerald-500/5">
+                                    <User size={36} className="text-emerald-600" />
+                                    <span className="text-[10px] font-bold text-emerald-400 mt-1">ไม่มีรูปถ่าย</span>
                                   </div>
                                 ) : (
-                                  <div className="relative group">
+                                  <div className="relative">
                                     <img 
                                       src={`https://azizstan.net/student_image/${studentInfo.id}.jpg`} 
                                       onError={() => setImgError(true)} 
-                                      className="w-24 h-24 md:w-28 md:h-28 rounded-2xl object-cover shadow-md border-4 border-white ring-4 ring-emerald-500/10 transition-transform duration-300 group-hover:scale-105" 
-                                      alt="รูปนักเรียน" 
+                                      className="w-24 h-24 md:w-28 md:h-28 rounded-2xl object-cover shadow-md border-4 border-white ring-4 ring-emerald-500/10 transition-transform duration-300 hover:scale-105" 
+                                      alt="รูปภาพนักเรียน" 
                                     />
                                     <div className="absolute -bottom-1.5 -right-1.5 bg-emerald-600 text-white rounded-full p-1 border-2 border-white shadow-sm">
-                                      <CheckCircle2 size={14} />
+                                      <CheckCircle2 size={12} />
                                     </div>
                                   </div>
                                 )}
                               </div>
 
                               {/* รายละเอียด */}
-                              <div className="flex-grow space-y-3 text-center md:text-left">
+                              <div className="flex-grow space-y-3.5 text-center md:text-left">
                                 <div>
-                                  <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-100 mb-1.5">
-                                    ดึงข้อมูลจาก Google Sheets สำเร็จ
+                                  <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-100 mb-1">
+                                    ตรวจสอบฐานข้อมูลสำเร็จ
                                   </span>
-                                  <h3 className="text-xl font-bold text-gray-800">
+                                  <h3 className="text-xl font-bold text-slate-800">
                                     {studentInfo.title || ''}{studentInfo.firstName} {studentInfo.lastName}
                                   </h3>
                                 </div>
                                 
-                                <div className="grid grid-cols-2 gap-4 max-w-md mx-auto md:mx-0">
-                                  <div className="bg-gray-50 p-2.5 rounded-xl border border-gray-100">
-                                    <p className="text-xs text-gray-400 font-medium">รหัสนักเรียน</p>
-                                    <p className="text-sm font-bold text-gray-700 font-mono mt-0.5">{studentInfo.id}</p>
+                                <div className="grid grid-cols-2 gap-4 max-w-sm mx-auto md:mx-0">
+                                  <div className="bg-slate-50 p-2.5 rounded-xl border border-slate-100/50">
+                                    <p className="text-[10px] text-slate-400 font-semibold tracking-wider uppercase">รหัสนักเรียน</p>
+                                    <p className="text-sm font-bold text-slate-700 font-mono mt-0.5">{studentInfo.id}</p>
                                   </div>
-                                  <div className="bg-gray-50 p-2.5 rounded-xl border border-gray-100">
-                                    <p className="text-xs text-gray-400 font-medium">ห้องเรียน</p>
-                                    <p className="text-sm font-bold text-gray-700 mt-0.5">{studentInfo.room}</p>
+                                  <div className="bg-slate-50 p-2.5 rounded-xl border border-slate-100/50">
+                                    <p className="text-[10px] text-slate-400 font-semibold tracking-wider uppercase">ห้องเรียน</p>
+                                    <p className="text-sm font-bold text-slate-700 mt-0.5">{studentInfo.room}</p>
                                   </div>
                                 </div>
                               </div>
 
+                              {/* ปุ่มแก้ไขข้อมูลกรณีไม่ถูกต้อง */}
                               <div className="mt-4 md:mt-0 flex justify-center md:block flex-shrink-0">
                                 <button 
                                   type="button" 
                                   onClick={() => setStudentInfo({...studentInfo, isEditing: true})} 
-                                  className="text-xs font-bold text-gray-500 hover:text-emerald-700 bg-gray-100 hover:bg-emerald-50 px-4 py-2.5 rounded-xl border border-gray-200 hover:border-emerald-200 transition-all">
-                                  แก้ไขข้อมูล
+                                  className="text-xs font-bold text-slate-500 hover:text-emerald-700 bg-slate-100 hover:bg-emerald-50 px-4 py-2.5 rounded-xl border border-slate-200 hover:border-emerald-200 transition-all shadow-sm">
+                                  แก้ไขข้อมูลนี้
                                 </button>
                               </div>
                             </div>
                           ) : (
-                            /* ฟอร์มกรอกข้อมูล */
-                            <div className="bg-white p-6 rounded-2xl border border-gray-200 shadow-sm space-y-4">
-                              <div className="flex items-center justify-between border-b border-gray-100 pb-3">
+                            /* ฟอร์มแก้ไขข้อมูลนักเรียน */
+                            <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-4">
+                              <div className="flex items-center justify-between border-b border-slate-100 pb-3">
                                 <div className="flex items-center gap-3">
-                                  <div className="w-10 h-10 rounded-lg bg-amber-50 flex items-center justify-center text-amber-600">
+                                  <div className="w-10 h-10 rounded-xl bg-amber-50 flex items-center justify-center text-amber-600">
                                     <User size={20} />
                                   </div>
                                   <div>
-                                    <h3 className="font-bold text-gray-800">
-                                      {studentInfo.isNew ? 'กรอกข้อมูลนักเรียนใหม่' : 'แก้ไขข้อมูลนักเรียน'}
+                                    <h3 className="font-bold text-slate-800">
+                                      {studentInfo.isNew ? 'กรอกประวัตินักเรียนใหม่' : 'แก้ไขข้อมูลเพื่อบันทึก'}
                                     </h3>
-                                    <p className="text-xs text-gray-500">รหัสนักเรียน: {studentInfo.id}</p>
+                                    <p className="text-xs text-slate-400">รหัสนักเรียน: {studentInfo.id}</p>
                                   </div>
                                 </div>
                                 {!studentInfo.isNew && (
                                   <button 
                                     type="button" 
                                     onClick={() => setStudentInfo({...studentInfo, isEditing: false})} 
-                                    className="text-xs font-bold text-emerald-600 hover:text-emerald-700 bg-emerald-50 hover:bg-emerald-100/70 px-3 py-1.5 rounded-lg transition-colors">
-                                    ดูการ์ดข้อมูล
+                                    className="text-xs font-bold text-emerald-700 hover:text-emerald-800 bg-emerald-50 px-3.5 py-1.5 rounded-lg transition-colors">
+                                    กลับไปดูการ์ด
                                   </button>
                                 )}
                               </div>
 
                               {studentInfo.isNew && (
-                                <div className="text-amber-600 text-xs mb-2 flex items-center gap-1 bg-amber-50 p-2.5 rounded-lg border border-amber-100 animate-fadeIn">
+                                <div className="text-amber-700 text-xs mb-2 flex items-center gap-1.5 bg-amber-50/50 p-3 rounded-xl border border-amber-100 animate-fadeIn">
                                   <AlertCircle size={16} />
-                                  ไม่พบข้อมูลรหัสนี้ในระบบ กรุณากรอกรายละเอียดเพื่อลงทะเบียนใหม่
+                                  ไม่พบข้อมูลรหัสนักเรียนนี้ในระบบลงทะเบียนหลัก คุณสามารถกรอกรายละเอียดเองได้ที่ฟิลด์ด้านล่าง
                                 </div>
                               )}
 
                               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                                 <div>
-                                  <label className="block text-xs font-semibold text-gray-500 mb-1">คำนำหน้า</label>
+                                  <label className="block text-xs font-bold text-slate-500 mb-1">คำนำหน้า</label>
                                   <input type="text"
                                     value={studentInfo.title || ''}
                                     onChange={(e) => setStudentInfo({...studentInfo, title: e.target.value})}
-                                    className="w-full p-2.5 border border-gray-300 rounded focus:ring-1 focus:ring-emerald-500 outline-none bg-white"
-                                    placeholder="ด.ช. / ด.ญ. / นาย / นางสาว" required />
+                                    className="w-full p-3 border border-slate-200 rounded-xl focus:ring-1 focus:ring-emerald-500 outline-none bg-white text-sm"
+                                    placeholder="เช่น ด.ช. / นาย" required />
                                 </div>
                                 <div>
-                                  <label className="block text-xs font-semibold text-gray-500 mb-1">ชื่อ</label>
+                                  <label className="block text-xs font-bold text-slate-500 mb-1">ชื่อจริง</label>
                                   <input type="text"
                                     value={studentInfo.firstName || ''}
                                     onChange={(e) => setStudentInfo({...studentInfo, firstName: e.target.value})}
-                                    className="w-full p-2.5 border border-gray-300 rounded focus:ring-1 focus:ring-emerald-500 outline-none bg-white"
+                                    className="w-full p-3 border border-slate-200 rounded-xl focus:ring-1 focus:ring-emerald-500 outline-none bg-white text-sm"
                                     required />
                                 </div>
                                 <div>
-                                  <label className="block text-xs font-semibold text-gray-500 mb-1">นามสกุล</label>
+                                  <label className="block text-xs font-bold text-slate-500 mb-1">นามสกุล</label>
                                   <input type="text"
                                     value={studentInfo.lastName || ''}
                                     onChange={(e) => setStudentInfo({...studentInfo, lastName: e.target.value})}
-                                    className="w-full p-2.5 border border-gray-300 rounded focus:ring-1 focus:ring-emerald-500 outline-none bg-white"
+                                    className="w-full p-3 border border-slate-200 rounded-xl focus:ring-1 focus:ring-emerald-500 outline-none bg-white text-sm"
                                     required />
                                 </div>
                               </div>
 
                               <div>
-                                <label className="block text-xs font-semibold text-gray-500 mb-1">ห้องเรียน</label>
+                                <label className="block text-xs font-bold text-slate-500 mb-1">ระดับชั้น / ห้องเรียน</label>
                                 <input type="text"
                                   value={studentInfo.room || ''}
                                   onChange={(e) => setStudentInfo({...studentInfo, room: e.target.value})}
-                                  className="w-full p-2.5 border border-gray-300 rounded focus:ring-1 focus:ring-emerald-500 outline-none bg-white"
+                                  className="w-full p-3 border border-slate-200 rounded-xl focus:ring-1 focus:ring-emerald-500 outline-none bg-white text-sm"
                                   placeholder="เช่น ม.1 Berdikari" required />
                               </div>
                             </div>
@@ -681,57 +957,99 @@
 
                       <button type="submit"
                         disabled={!studentInfo || isSubmitting}
-                        className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3.5 px-4 rounded-lg transition-colors disabled:opacity-50 flex items-center justify-center gap-2 shadow-sm">
+                        className="w-full bg-emerald-700 hover:bg-emerald-800 text-white font-bold py-4 px-6 rounded-2xl transition-all disabled:opacity-50 flex items-center justify-center gap-2 shadow-md shadow-emerald-700/20 text-md">
                         {isSubmitting ? (
-                          <span className="flex items-center gap-2"><Loader2 size={20} className="animate-spin" /> กำลังบันทึกข้อมูล...</span>
+                          <span className="flex items-center gap-2"><Loader2 size={20} className="animate-spin" /> กำลังตรวจสอบและบันทึกข้อมูล...</span>
                         ) : (
-                          <React.Fragment><Save size={20} /> ยืนยันการลงทะเบียน</React.Fragment>
+                          <React.Fragment><Save size={20} /> ยืนยันข้อมูลและลงทะเบียน</React.Fragment>
                         )}
                       </button>
                     </form>
                   </div>
                 )}
 
+                {/* 2. แท็บตารางแสดงผู้ลงทะเบียนพร้อมระบบ CRUD เต็มรูปแบบ */}
                 {activeTab === 'list' && (
-                  <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-                    <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
-                      <h2 className="text-xl font-bold text-gray-800 flex items-center gap-2">
-                        <Users className="text-emerald-600" />
-                        รายชื่อผู้ลงทะเบียน ({registeredList.length} คน)
-                      </h2>
-                      <button onClick={exportToCSV}
-                        disabled={registeredList.length === 0}
-                        className="w-full sm:w-auto bg-gray-800 hover:bg-gray-900 text-white text-sm font-medium py-2 px-4 rounded-lg flex items-center justify-center gap-2 transition-colors disabled:opacity-50">
-                        <Download size={16} />
-                        โหลด Excel/CSV
-                      </button>
+                  <div className="bg-white rounded-3xl shadow-sm border border-slate-200/80 p-6 animate-fadeIn">
+                    
+                    {/* ส่วนหัว และปุ่มควบคุม CRUD */}
+                    <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4 border-b border-slate-100 pb-4">
+                      <div>
+                        <h2 className="text-xl font-bold text-emerald-800 flex items-center gap-2">
+                          <Users className="text-emerald-700" />
+                          รายชื่อผู้ลงทะเบียนจริง ({registeredList.length} คน)
+                        </h2>
+                        <p className="text-xs text-slate-500 mt-1">สามารถทำการเพิ่ม แก้ไข หรือลบข้อมูลผู้เข้าร่วมโครงการได้จากส่วนนี้</p>
+                      </div>
+                      
+                      <div className="flex gap-2 w-full sm:w-auto">
+                        <button onClick={openCreateModal}
+                          className="flex-1 sm:flex-initial bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold py-2.5 px-4 rounded-xl flex items-center justify-center gap-1.5 transition-colors shadow-sm">
+                          <Plus size={16} /> เพิ่มคนลงทะเบียน
+                        </button>
+                        <button onClick={exportToCSV}
+                          disabled={registeredList.length === 0}
+                          className="flex-1 sm:flex-initial bg-slate-800 hover:bg-slate-900 text-white text-xs font-bold py-2.5 px-4 rounded-xl flex items-center justify-center gap-1.5 transition-all disabled:opacity-50 shadow-sm">
+                          <Download size={16} /> โหลดไฟล์ Excel/CSV
+                        </button>
+                      </div>
                     </div>
 
+                    {/* แสดงตารางผู้ลงทะเบียน */}
                     {registeredList.length === 0 ? (
-                      <div className="text-center py-16 text-gray-500 bg-gray-50 rounded-lg border border-dashed border-gray-300">
-                        <Users size={48} className="mx-auto text-gray-300 mb-4" />
-                        <p className="font-medium">ยังไม่มีผู้ลงทะเบียนในขณะนี้</p>
+                      <div className="text-center py-16 text-slate-400 bg-slate-50/50 rounded-2xl border border-dashed border-slate-200">
+                        <Users size={48} className="mx-auto text-slate-300 mb-4" />
+                        <p className="font-bold text-sm text-slate-500">ยังไม่มีประวัติการลงทะเบียนในฐานข้อมูลขณะนี้</p>
+                        <p className="text-xs text-slate-400 mt-1">เปิดหน้าฟอร์มสมัครเพื่อกดลงทะเบียนเป็นคนแรก</p>
                       </div>
                     ) : (
-                      <div className="overflow-x-auto rounded-lg border border-gray-200">
-                        <table className="w-full text-sm text-left text-gray-500 whitespace-nowrap">
-                          <thead className="text-xs text-gray-700 uppercase bg-gray-50 border-b border-gray-200">
+                      <div className="overflow-x-auto rounded-2xl border border-slate-200">
+                        <table className="w-full text-sm text-left text-slate-500 whitespace-nowrap">
+                          <thead className="text-xs text-slate-700 uppercase bg-slate-50 border-b border-slate-200">
                             <tr>
-                              <th className="px-4 py-3">ลำดับ</th>
-                              <th className="px-4 py-3">เวลาที่ลงทะเบียน</th>
-                              <th className="px-4 py-3">รหัส</th>
-                              <th className="px-4 py-3">ชื่อ-นามสกุล</th>
-                              <th className="px-4 py-3">ห้องเรียน</th>
+                              <th className="px-4 py-3.5">ลำดับ</th>
+                              <th className="px-4 py-3.5">วันเวลาที่สมัคร</th>
+                              <th className="px-4 py-3.5">รูปภาพ</th>
+                              <th className="px-4 py-3.5">รหัสนักเรียน</th>
+                              <th className="px-4 py-3.5">ชื่อ-นามสกุล</th>
+                              <th className="px-4 py-3.5">ห้องเรียน</th>
+                              <th className="px-4 py-3.5 text-center">จัดการ</th>
                             </tr>
                           </thead>
                           <tbody>
                             {registeredList.map((user, index) => (
-                              <tr key={index} className="bg-white border-b hover:bg-gray-50">
-                                <td className="px-4 py-3 font-medium text-gray-900">{registeredList.length - index}</td>
-                                <td className="px-4 py-3 text-xs">{user.timestamp}</td>
-                                <td className="px-4 py-3 font-mono">{user.studentId}</td>
-                                <td className="px-4 py-3 font-medium text-gray-900">{user.fullName}</td>
-                                <td className="px-4 py-3"><span className="bg-blue-50 text-blue-700 px-2 py-1 rounded-md text-xs border border-blue-100">{user.room}</span></td>
+                              <tr key={index} className="bg-white border-b hover:bg-slate-50/50 transition-colors">
+                                <td className="px-4 py-4 font-bold text-slate-900">{registeredList.length - index}</td>
+                                <td className="px-4 py-4 text-xs font-medium text-slate-500">{user.timestamp}</td>
+                                <td className="px-4 py-4">
+                                  <img 
+                                    src={`https://azizstan.net/student_image/${user.studentId}.jpg`} 
+                                    onError={(e) => { e.target.src = 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="%23047857" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>' }}
+                                    className="w-8 h-8 rounded-lg object-cover shadow-sm bg-emerald-50 p-0.5 border border-emerald-100" 
+                                    alt="รูปถ่าย" 
+                                  />
+                                </td>
+                                <td className="px-4 py-4 font-mono font-bold text-slate-700">{user.studentId}</td>
+                                <td className="px-4 py-4 font-bold text-slate-800">{user.fullName}</td>
+                                <td className="px-4 py-4">
+                                  <span className="bg-emerald-50 text-emerald-800 px-2.5 py-1 rounded-lg text-xs font-semibold border border-emerald-100/50">
+                                    {user.room}
+                                  </span>
+                                </td>
+                                <td className="px-4 py-4 text-center">
+                                  <div className="inline-flex gap-1">
+                                    <button onClick={() => openEditModal(user)}
+                                      className="p-1.5 text-blue-600 hover:text-blue-800 hover:bg-blue-50 rounded-lg transition-colors"
+                                      title="แก้ไขข้อมูล">
+                                      <Edit2 size={16} />
+                                    </button>
+                                    <button onClick={() => openDeleteModal(user)}
+                                      className="p-1.5 text-red-600 hover:text-red-800 hover:bg-red-50 rounded-lg transition-colors"
+                                      title="ลบข้อมูล">
+                                      <Trash size={16} />
+                                    </button>
+                                  </div>
+                                </td>
                               </tr>
                             ))}
                           </tbody>
@@ -741,115 +1059,154 @@
                   </div>
                 )}
 
+                {/* 3. แท็บหน้าตั้งค่าแอดมินและการจัดการโลโก้ */}
                 {activeTab === 'settings' && (
                   <div>
                     {!isUnlocked ? (
-                      /* ฟอร์มเข้าสู่ระบบความปลอดภัย */
-                      <div className="max-w-md mx-auto bg-white rounded-xl shadow-sm border border-gray-200 p-8 text-center animate-fadeIn">
-                        <div className="mx-auto w-16 h-16 bg-emerald-50 rounded-full flex items-center justify-center text-emerald-600 mb-4">
-                          <Lock size={32} />
+                      /* ฟอร์มตรวจสอบรหัสผ่านความปลอดภัย */
+                      <div className="max-w-md mx-auto bg-white rounded-3xl shadow-sm border border-slate-200 p-8 text-center animate-fadeIn">
+                        <div className="mx-auto w-16 h-16 bg-emerald-50 rounded-full flex items-center justify-center text-emerald-700 mb-4 ring-8 ring-emerald-500/5">
+                          <Lock size={28} />
                         </div>
-                        <h2 className="text-xl font-bold text-gray-800 mb-2">หน้าต่างนี้สำหรับผู้ดูแลระบบ</h2>
-                        <p className="text-sm text-gray-500 mb-6">กรุณาระบุรหัสผ่านเพื่อเข้าใช้งานหน้าตั้งค่าและอัปโหลดฐานข้อมูล</p>
+                        <h2 className="text-xl font-bold text-slate-800 mb-1">พื้นที่ส่วนควบคุมหลังบ้าน</h2>
+                        <p className="text-xs text-slate-500 mb-6">กรุณาระบุรหัสเพื่อสิทธิ์จัดการโครงสร้างระบบและโลโก้</p>
                         
                         <form onSubmit={handlePasswordSubmit} className="space-y-4">
                           <div>
                             <input type="password"
                               value={passwordInput}
                               onChange={(e) => setPasswordInput(e.target.value)}
-                              placeholder="กรอกรหัสผ่าน (รหัสผ่านเริ่มต้น: aaaaaa)"
-                              className="w-full p-3 border border-gray-300 rounded-lg text-center focus:ring-2 focus:ring-emerald-500 outline-none"
+                              placeholder="ระบุรหัสผ่าน (เริ่มต้น: aaaaaa)"
+                              className="w-full p-3.5 border border-slate-200 rounded-2xl text-center focus:ring-2 focus:ring-emerald-600 outline-none text-md"
                               required />
                           </div>
                           {passwordError && (
-                            <p className="text-red-500 text-xs font-semibold">{passwordError}</p>
+                            <p className="text-red-600 text-xs font-bold animate-fadeIn">{passwordError}</p>
                           )}
                           <button type="submit"
-                            className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3 px-4 rounded-lg transition-colors flex items-center justify-center gap-2 shadow-sm">
-                            <Unlock size={18} /> ยืนยันรหัสผ่าน
+                            className="w-full bg-emerald-700 hover:bg-emerald-800 text-white font-bold py-3.5 px-4 rounded-2xl transition-all flex items-center justify-center gap-2 shadow-md shadow-emerald-700/25">
+                            <Unlock size={18} /> ปลดล็อคระบบ
                           </button>
                         </form>
                       </div>
                     ) : (
-                      /* หน้าตั้งค่าและจัดการฐานข้อมูล (เมื่อปลดล็อคแล้ว) */
+                      /* เมนูหลักหลังบ้านหลังปลดล็อคแล้ว */
                       <div className="space-y-6 animate-fadeIn">
                         
-                        {/* ส่วนหัว และปุ่มล็อคหน้า */}
-                        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                        {/* การ์ดบอกสถานะและการออกจากระบบ */}
+                        <div className="bg-white rounded-2xl shadow-sm border border-slate-200/80 p-6 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                           <div>
-                            <h2 className="text-xl font-bold text-gray-800 flex items-center gap-2">
-                              <Unlock className="text-emerald-600" size={24} />
-                              เมนูการตั้งค่าและฐานข้อมูล
+                            <h2 className="text-lg font-bold text-slate-800 flex items-center gap-2">
+                              <Unlock className="text-emerald-700" size={20} />
+                              คุณมีสิทธิ์ระดับผู้ดูแลระบบ (Admin)
                             </h2>
-                            <p className="text-sm text-gray-500">ปลดล็อคสิทธิ์เข้าถึงแล้ว</p>
+                            <p className="text-xs text-slate-500">สามารถแก้ไขการตั้งค่าหลัก โลโก้ และฐานข้อมูลได้ในหน้านี้</p>
                           </div>
                           <button onClick={handleLockSettings}
-                            className="w-full sm:w-auto bg-gray-100 hover:bg-gray-200 text-gray-600 text-sm font-semibold py-2 px-4 rounded-lg flex items-center justify-center gap-2 transition-colors border border-gray-200">
-                            <Lock size={16} /> ล็อคระบบ / ออก
+                            className="w-full sm:w-auto bg-slate-100 hover:bg-slate-200 text-slate-600 text-xs font-bold py-2.5 px-4 rounded-xl flex items-center justify-center gap-1.5 transition-colors border border-slate-200">
+                            <Lock size={14} /> ออกจากผู้ดูแลระบบ
                           </button>
                         </div>
 
-                        {/* การจัดฐานข้อมูลนักเรียน */}
-                        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 md:p-8">
-                          <h3 className="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2 border-b border-gray-100 pb-3">
-                            <FileSpreadsheet className="text-emerald-600" />
-                            การอัปโหลดฐานข้อมูลนักเรียนตรงไปยัง Google Sheets
+                        {/* ฟีเจอร์ที่ 1: การเปลี่ยนโลโก้ระบบ */}
+                        <div className="bg-white rounded-3xl shadow-sm border border-slate-200/80 p-6 md:p-8">
+                          <h3 className="text-md font-bold text-slate-800 mb-4 flex items-center gap-2 border-b border-slate-100 pb-3">
+                            <Sparkles className="text-emerald-700" size={18} />
+                            ตั้งค่าตราสัญลักษณ์ / โลโก้ระบบ
+                          </h3>
+                          
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-center">
+                            <div className="flex flex-col items-center justify-center bg-slate-50 p-6 rounded-2xl border border-slate-200/50">
+                              {systemLogo ? (
+                                <img src={systemLogo} className="w-24 h-24 object-cover rounded-2xl bg-white p-2 border-2 border-amber-500 shadow-md mb-3" alt="โลโก้ปัจจุบัน" />
+                              ) : (
+                                <div className="w-24 h-24 rounded-2xl bg-emerald-50 border border-emerald-100 flex items-center justify-center text-emerald-600 shadow-inner mb-3">
+                                  <User size={48} />
+                                </div>
+                              )}
+                              <p className="text-xs font-bold text-slate-700">ตัวอย่างการแสดงโลโก้บนแถบเมนูหลัก</p>
+                              {systemLogo && (
+                                <button onClick={handleResetLogo} className="text-[10px] text-red-600 hover:underline font-bold mt-2 flex items-center gap-0.5">
+                                  <Trash2 size={12} /> ล้างโลโก้เดิม
+                                </button>
+                              )}
+                            </div>
+
+                            <div className="space-y-4">
+                              <p className="text-xs text-slate-500 leading-relaxed">
+                                คุณสามารถอัปโหลดไฟล์ภาพสัญลักษณ์ (เช่น โลโก้ของสถาบัน/โรงเรียนของคุณ) เพื่อไปแสดงบนส่วนหัวหน้าจอ ระบบจะจัดเก็บและแสดงตราสัญลักษณ์นี้โดยอัตโนมัติ
+                              </p>
+                              <div className="flex flex-col gap-2">
+                                <label className="cursor-pointer bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-xs py-3 px-4 rounded-xl transition-all text-center shadow-sm">
+                                  เลือกภาพอัปโหลด (.png, .jpg)
+                                  <input type="file" accept="image/*" onChange={handleLogoUpload} className="hidden" />
+                                </label>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* ฟีเจอร์ที่ 2: ระบบจัดการเชื่อมโยงชีทและอัปโหลดรายชื่อ CSV */}
+                        <div className="bg-white rounded-3xl shadow-sm border border-slate-200/80 p-6 md:p-8">
+                          <h3 className="text-md font-bold text-slate-800 mb-4 flex items-center gap-2 border-b border-slate-100 pb-3">
+                            <FileSpreadsheet className="text-emerald-700" size={18} />
+                            การอัปโหลดฐานข้อมูลหลัก (.csv) ตรงไปยัง Google Sheets
                           </h3>
 
                           {uploadError && (
-                            <div className="mb-4 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg flex items-start gap-2 text-sm">
-                              <AlertCircle size={20} className="text-red-500 flex-shrink-0" />
+                            <div className="mb-4 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl flex items-start gap-2 text-xs">
+                              <AlertCircle size={18} className="text-red-500 flex-shrink-0" />
                               <span>{uploadError}</span>
                             </div>
                           )}
 
                           {uploadSuccess && (
-                            <div className="mb-4 bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-lg flex items-start gap-2 text-sm">
-                              <CheckCircle2 size={20} className="text-green-500 flex-shrink-0" />
+                            <div className="mb-4 bg-emerald-50 border border-emerald-200 text-emerald-800 px-4 py-3 rounded-xl flex items-start gap-2 text-xs">
+                              <CheckCircle2 size={18} className="text-emerald-600 flex-shrink-0" />
                               <span>{uploadSuccess}</span>
                             </div>
                           )}
 
                           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
                             <div className="space-y-4">
-                              <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
-                                <p className="text-xs text-gray-500 font-semibold uppercase tracking-wider">สถานะฐานข้อมูลปัจจุบัน</p>
-                                <p className="text-lg font-bold text-gray-800 mt-1">
-                                  {dbSource === 'sheet' ? '✅ ซิงก์เชื่อมโยงกับ Google Sheets เรียบร้อย' : 
-                                   dbSource === 'local' ? '📂 โหลดจากหน่วยความจำแคชสำรอง (Offline Cache)' : 
-                                   dbSource === 'default' ? '⚙️ ฐานข้อมูลจำลอง (Default)' : '🔄 กำลังดึงข้อมูล...'}
+                              <div className="bg-slate-50 p-4 rounded-xl border border-slate-100">
+                                <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">สถานะฐานข้อมูลหลัก</p>
+                                <p className="text-md font-bold text-slate-800 mt-1">
+                                  {dbSource === 'sheet' ? '✅ เชื่อมโยงกับ Google Sheets เรียบร้อย' : 
+                                   dbSource === 'local' ? '📂 โหลดจากระบบสำรองข้อมูลในเครื่อง (Offline Cache)' : 
+                                   '⚙️ ข้อมูลทดสอบระบบ (Default)'}
                                 </p>
-                                <p className="text-sm text-gray-600 mt-1">
-                                  จำนวนนักเรียนในระบบ: <span className="font-bold text-emerald-600">{studentDb.length}</span> คน
+                                <p className="text-xs text-slate-600 mt-1">
+                                  จำนวนรายชื่อในการค้นหา: <span className="font-bold text-emerald-600">{studentDb.length}</span> คน
                                 </p>
                               </div>
 
                               <div className="flex flex-col sm:flex-row gap-2">
                                 <button onClick={downloadTemplate}
-                                  className="flex-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 text-sm font-semibold py-3 px-4 rounded-lg flex items-center justify-center gap-2 transition-colors">
-                                  <Download size={18} /> ดาวน์โหลดเทมเพลต CSV
+                                  className="flex-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 text-xs font-bold py-3 px-4 rounded-xl flex items-center justify-center gap-1.5 transition-colors">
+                                  <Download size={16} /> เทมเพลต CSV
                                 </button>
                                 <button onClick={handleResetToDefault}
-                                  className="bg-gray-100 hover:bg-gray-200 text-gray-700 border border-gray-200 text-sm font-semibold py-3 px-4 rounded-lg flex items-center justify-center gap-2 transition-colors">
-                                  <RefreshCw size={18} className={isLoadingDb ? "animate-spin" : ""} /> ซิงก์ข้อมูลใหม่จากชีท
+                                  className="bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 text-xs font-bold py-3 px-4 rounded-xl flex items-center justify-center gap-1.5 transition-colors">
+                                  <RefreshCw size={14} className={isLoadingDb ? "animate-spin" : ""} /> ซิงก์รายชื่อจากชีท
                                 </button>
                               </div>
                             </div>
 
-                            <div className="bg-gray-50 p-6 rounded-lg border-2 border-dashed border-gray-300 hover:border-emerald-500 transition-all flex flex-col items-center justify-center text-center">
+                            <div className="bg-slate-50/50 p-6 rounded-2xl border-2 border-dashed border-slate-300 hover:border-emerald-600 transition-all flex flex-col items-center justify-center text-center">
                               {isUploadingDb ? (
                                 <div className="space-y-2 py-4">
-                                  <Loader2 size={36} className="text-emerald-600 animate-spin mx-auto" />
-                                  <p className="font-bold text-sm text-gray-700">กำลังส่งข้อมูลไปยัง Google Sheets...</p>
+                                  <Loader2 size={36} className="text-emerald-700 animate-spin mx-auto" />
+                                  <p className="font-bold text-xs text-slate-700">กำลังอัปเดตและเขียนตารางใหม่ลง Google Sheets...</p>
                                 </div>
                               ) : (
                                 <React.Fragment>
-                                  <Upload size={36} className="text-gray-400 mb-2 animate-bounce" />
-                                  <p className="font-bold text-sm text-gray-700 mb-1">เลือกไฟล์ CSV เพื่อนำเข้า Google Sheets</p>
-                                  <p className="text-xs text-gray-500 mb-4">ข้อมูลจะไปเขียนแทนที่ฐานข้อมูลนักเรียนใน Google Sheets ทันที</p>
+                                  <Upload size={32} className="text-slate-400 mb-2 animate-bounce" />
+                                  <p className="font-bold text-xs text-slate-700 mb-1">เลือกไฟล์ข้อมูล CSV นำเข้าสู่ Google Sheets</p>
+                                  <p className="text-[10px] text-slate-400 mb-4">ข้อมูลจะถูกนำไปเขียนแทนตารางรายชื่อนักเรียนหลักทันที</p>
                                   
-                                  <label className="cursor-pointer bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-sm py-2 px-6 rounded-lg transition-colors shadow-sm">
-                                    อัปโหลดไฟล์ข้อมูลใหม่
+                                  <label className="cursor-pointer bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-xs py-2 px-6 rounded-xl transition-all shadow-sm">
+                                    นำเข้าข้อมูลใหม่
                                     <input type="file" accept=".csv" onChange={handleCsvUpload} className="hidden" disabled={isUploadingDb} />
                                   </label>
                                 </React.Fragment>
@@ -858,64 +1215,60 @@
                           </div>
                         </div>
 
-                        {/* การตั้งค่าโครงการ (ทั่วไป) */}
-                        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 md:p-8">
-                          <h3 className="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2 border-b border-gray-100 pb-3">
-                            <Settings className="text-emerald-600" />
-                            ตั้งค่ารายละเอียดโครงการ
+                        {/* การตั้งค่าระบบลงทะเบียนทั่วไป */}
+                        <div className="bg-white rounded-3xl shadow-sm border border-slate-200/80 p-6 md:p-8">
+                          <h3 className="text-md font-bold text-slate-800 mb-4 flex items-center gap-2 border-b border-slate-100 pb-3">
+                            <Settings className="text-emerald-700" size={18} />
+                            ข้อมูลรายละเอียดระบบลงทะเบียน
                           </h3>
                           
                           <div className="space-y-6">
                             <div>
-                              <label className="block text-sm font-semibold text-gray-700 mb-1">ชื่อโครงการ</label>
+                              <label className="block text-xs font-bold text-slate-500 mb-1">ชื่อโครงการ</label>
                               <input type="text"
                                 value={projectSettings.title}
                                 onChange={(e) => setProjectSettings({...projectSettings, title: e.target.value})}
-                                className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none" />
+                                className="w-full p-3 border border-slate-200 rounded-xl focus:ring-1 focus:ring-emerald-500 outline-none text-sm bg-white" />
                             </div>
 
                             <div>
-                              <label className="block text-sm font-semibold text-gray-700 mb-1">รายละเอียดโครงการ</label>
+                              <label className="block text-xs font-bold text-slate-500 mb-1">รายละเอียดและคำอธิบายโครงการ</label>
                               <textarea value={projectSettings.description}
                                 onChange={(e) => setProjectSettings({...projectSettings, description: e.target.value})}
                                 rows="3"
-                                className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none leading-relaxed" />
+                                className="w-full p-3 border border-slate-200 rounded-xl focus:ring-1 focus:ring-emerald-500 outline-none leading-relaxed text-sm bg-white" />
                               
-                              <div className="mt-3 p-4 bg-gradient-to-br from-indigo-50 to-purple-50 rounded-lg border border-indigo-100">
-                                <label className="flex items-center gap-2 text-sm font-bold text-indigo-900 mb-2">
-                                  <Sparkles size={16} className="text-indigo-500" />
-                                  ผู้ช่วย AI ร่างรายละเอียด
+                              {/* ส่วนช่วยเหลือ AI */}
+                              <div className="mt-3 p-4 bg-gradient-to-br from-amber-50/40 to-emerald-50/40 rounded-xl border border-amber-100/50">
+                                <label className="flex items-center gap-1.5 text-xs font-bold text-emerald-800 mb-2">
+                                  <Sparkles size={16} className="text-amber-500" />
+                                  ให้ระบบ AI ช่วยเขียนรายละเอียดโครงการ
                                 </label>
-                                <p className="text-xs text-indigo-700 mb-3">พิมพ์หัวข้อคร่าวๆ ที่ต้องการ แล้วให้ AI ช่วยร่างข้อความที่สละสลวยให้คุณ</p>
                                 <div className="flex flex-col sm:flex-row gap-2">
                                   <input type="text"
                                     value={aiTopic}
                                     onChange={(e) => setAiTopic(e.target.value)}
-                                    placeholder="เช่น เน้นมารยาทในการละหมาด หรือ การอาบน้ำละหมาดที่ถูกต้อง..."
-                                    className="flex-1 p-2.5 text-sm border border-indigo-200 rounded-md focus:ring-2 focus:ring-indigo-400 outline-none"
+                                    placeholder="เช่น มารยาทการละหมาด หรือ ความสำคัญ..."
+                                    className="flex-1 p-2.5 text-xs border border-slate-200 rounded-xl focus:ring-1 focus:ring-emerald-500 outline-none"
                                     disabled={isGeneratingDesc} />
                                   <button onClick={handleGenerateDescription}
                                     disabled={isGeneratingDesc}
-                                    className="bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium py-2.5 px-4 rounded-md transition-colors disabled:opacity-50 flex justify-center items-center gap-1 whitespace-nowrap shadow-sm">
-                                    {isGeneratingDesc ? (
-                                      <React.Fragment><Loader2 size={16} className="animate-spin" /> กำลังประมวลผล...</React.Fragment>
-                                    ) : (
-                                      <React.Fragment>✨ ร่างข้อความด้วย AI</React.Fragment>
-                                    )}
+                                    className="bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-bold py-2.5 px-4 rounded-xl transition-all disabled:opacity-50 flex justify-center items-center gap-1 shadow-sm whitespace-nowrap">
+                                    {isGeneratingDesc ? <Loader2 size={14} className="animate-spin" /> : '✨ ร่างข้อความ'}
                                   </button>
                                 </div>
                                 {descAiError && <p className="text-red-500 text-xs mt-2 font-medium">{descAiError}</p>}
                               </div>
                             </div>
 
-                            <div className="pt-6 border-t border-gray-200">
-                              <label className="block text-sm font-semibold text-gray-700 mb-1">การเชื่อมต่อฐานข้อมูล (Google Apps Script URL)</label>
-                              <p className="text-xs text-gray-500 mb-3">นำ URL ที่ได้จากขั้นตอนการทำ Google Sheet มาวางที่นี่เพื่อส่งข้อมูลลงทะเบียนและดึงฐานข้อมูล</p>
+                            <div className="pt-6 border-t border-slate-100">
+                              <label className="block text-xs font-bold text-slate-500 mb-1">การเชื่อมต่อ Google Apps Script URL</label>
+                              <p className="text-[10px] text-slate-400 mb-3">วาง URL ที่ได้จากขั้นตอนการติดตั้งสคริปต์ลงในช่องนี้เพื่อให้ระบบซิงก์ข้อมูลสองฝั่ง</p>
                               <input type="text"
                                 value={projectSettings.googleScriptUrl}
                                 onChange={(e) => setProjectSettings({...projectSettings, googleScriptUrl: e.target.value})}
-                                placeholder="https://script.google.com/macros/s/AKfycb.../exec"
-                                className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none font-mono text-sm bg-gray-50" />
+                                placeholder="https://script.google.com/macros/s/.../exec"
+                                className="w-full p-3 border border-slate-200 rounded-xl focus:ring-1 focus:ring-emerald-500 outline-none font-mono text-xs bg-slate-50" />
                             </div>
                           </div>
                         </div>
@@ -925,6 +1278,177 @@
                   </div>
                 )}
               </main>
+
+              {/* ==========================================
+                  ระบบ MODALS สิทธิ์เข้าจัดงานข้อมูล (CRUD)
+                 ========================================== */}
+
+              {/* A. Modal สำหรับสร้างผู้ลงทะเบียนใหม่ (C) */}
+              {isCreateOpen && (
+                <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-fadeIn">
+                  <form onSubmit={handleCreateConfirm} className="bg-white rounded-3xl shadow-2xl border border-slate-100 max-w-md w-full p-6 space-y-4 animate-scaleUp">
+                    <div className="flex justify-between items-center border-b border-slate-100 pb-3">
+                      <h3 className="font-bold text-slate-800 text-md flex items-center gap-1.5">
+                        <Plus className="text-emerald-700" size={20} />
+                        เพิ่มข้อมูลผู้ลงทะเบียนใหม่
+                      </h3>
+                      <button type="button" onClick={() => setIsCreateOpen(false)} className="text-slate-400 hover:text-slate-600"><X size={20} /></button>
+                    </div>
+
+                    {modalError && (
+                      <div className="bg-red-50 border border-red-200 text-red-700 text-xs px-3.5 py-2.5 rounded-xl flex items-center gap-2">
+                        <AlertCircle size={16} />
+                        <span>{modalError}</span>
+                      </div>
+                    )}
+
+                    <div className="space-y-4">
+                      <div>
+                        <label className="block text-xs font-bold text-slate-500 mb-1.5">รหัสนักเรียน (5 หลัก)</label>
+                        <input type="text"
+                          value={modalStudentId}
+                          onChange={(e) => setModalStudentId(e.target.value.replace(/[^0-9]/g, '').slice(0, 5))}
+                          placeholder="เช่น 26858"
+                          className="w-full p-3 border border-slate-200 rounded-xl focus:ring-1 focus:ring-emerald-500 outline-none text-sm"
+                          required />
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-bold text-slate-500 mb-1.5">ชื่อจริง - นามสกุล</label>
+                        <input type="text"
+                          value={modalFullName}
+                          onChange={(e) => setModalFullName(e.target.value)}
+                          placeholder="ด.ช. อัซรี เตะ"
+                          className="w-full p-3 border border-slate-200 rounded-xl focus:ring-1 focus:ring-emerald-500 outline-none text-sm"
+                          required />
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-bold text-slate-500 mb-1.5">ระดับชั้น / ห้องเรียน</label>
+                        <input type="text"
+                          value={modalRoom}
+                          onChange={(e) => setModalRoom(e.target.value)}
+                          placeholder="ม.1 Berdikari"
+                          className="w-full p-3 border border-slate-200 rounded-xl focus:ring-1 focus:ring-emerald-500 outline-none text-sm"
+                          required />
+                      </div>
+                    </div>
+
+                    <div className="flex gap-2 pt-2 border-t border-slate-100">
+                      <button type="button" onClick={() => setIsCreateOpen(false)}
+                        className="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-600 text-xs font-bold py-3 rounded-xl transition-colors">
+                        ยกเลิก
+                      </button>
+                      <button type="submit" disabled={isModalSubmitting}
+                        className="flex-1 bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-bold py-3 rounded-xl transition-all shadow-md flex items-center justify-center gap-1.5">
+                        {isModalSubmitting ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
+                        <span>เพิ่มลงทะเบียน</span>
+                      </button>
+                    </div>
+                  </form>
+                </div>
+              )}
+
+              {/* B. Modal สำหรับแก้ไขข้อมูล (U) */}
+              {isEditOpen && (
+                <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-fadeIn">
+                  <form onSubmit={handleEditConfirm} className="bg-white rounded-3xl shadow-2xl border border-slate-100 max-w-md w-full p-6 space-y-4 animate-scaleUp">
+                    <div className="flex justify-between items-center border-b border-slate-100 pb-3">
+                      <h3 className="font-bold text-slate-800 text-md flex items-center gap-1.5">
+                        <Edit2 className="text-emerald-700" size={16} />
+                        แก้ไขข้อมูลผู้ลงทะเบียน
+                      </h3>
+                      <button type="button" onClick={() => setIsEditOpen(false)} className="text-slate-400 hover:text-slate-600"><X size={20} /></button>
+                    </div>
+
+                    {modalError && (
+                      <div className="bg-red-50 border border-red-200 text-red-700 text-xs px-3.5 py-2.5 rounded-xl flex items-center gap-2">
+                        <AlertCircle size={16} />
+                        <span>{modalError}</span>
+                      </div>
+                    )}
+
+                    <div className="space-y-4">
+                      <div>
+                        <label className="block text-xs font-bold text-slate-500 mb-1.5">รหัสนักเรียน (ห้ามแก้ไข)</label>
+                        <input type="text"
+                          value={modalStudentId}
+                          disabled
+                          className="w-full p-3 border border-slate-200 rounded-xl bg-slate-50 text-slate-400 font-mono text-sm" />
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-bold text-slate-500 mb-1.5">ชื่อจริง - นามสกุล</label>
+                        <input type="text"
+                          value={modalFullName}
+                          onChange={(e) => setModalFullName(e.target.value)}
+                          className="w-full p-3 border border-slate-200 rounded-xl focus:ring-1 focus:ring-emerald-500 outline-none text-sm"
+                          required />
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-bold text-slate-500 mb-1.5">ระดับชั้น / ห้องเรียน</label>
+                        <input type="text"
+                          value={modalRoom}
+                          onChange={(e) => setModalRoom(e.target.value)}
+                          className="w-full p-3 border border-slate-200 rounded-xl focus:ring-1 focus:ring-emerald-500 outline-none text-sm"
+                          required />
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-bold text-slate-500 mb-1.5">วันเวลาลงทะเบียน (แคช)</label>
+                        <input type="text"
+                          value={modalTimestamp}
+                          onChange={(e) => setModalTimestamp(e.target.value)}
+                          className="w-full p-3 border border-slate-200 rounded-xl focus:ring-1 focus:ring-emerald-500 outline-none text-sm"
+                          required />
+                      </div>
+                    </div>
+
+                    <div className="flex gap-2 pt-2 border-t border-slate-100">
+                      <button type="button" onClick={() => setIsEditOpen(false)}
+                        className="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-600 text-xs font-bold py-3 rounded-xl transition-colors">
+                        ยกเลิก
+                      </button>
+                      <button type="submit" disabled={isModalSubmitting}
+                        className="flex-1 bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-bold py-3 rounded-xl transition-all shadow-md flex items-center justify-center gap-1.5">
+                        {isModalSubmitting ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
+                        <span>บันทึกการแก้ไข</span>
+                      </button>
+                    </div>
+                  </form>
+                </div>
+              )}
+
+              {/* C. Modal ยืนยันการลบข้อมูล (D) */}
+              {isDeleteOpen && (
+                <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-fadeIn">
+                  <div className="bg-white rounded-3xl shadow-2xl border border-slate-100 max-w-sm w-full p-6 space-y-4 animate-scaleUp text-center">
+                    <div className="mx-auto w-14 h-14 bg-red-50 rounded-full flex items-center justify-center text-red-600 ring-8 ring-red-500/5">
+                      <Trash size={26} />
+                    </div>
+                    <div>
+                      <h3 className="font-bold text-slate-800 text-lg">ต้องการลบข้อมูลจริงหรือไม่?</h3>
+                      <p className="text-xs text-slate-500 mt-1.5 leading-relaxed">
+                        คุณกำลังดำเนินการลบข้อมูลของ **{deletingRecord?.fullName}** ({deletingRecord?.studentId}) การกระทำนี้ไม่สามารถย้อนคืนได้เมื่อบันทึกลงชีทแล้ว
+                      </p>
+                    </div>
+
+                    <div className="flex gap-2 pt-2 border-t border-slate-100">
+                      <button type="button" onClick={() => setIsDeleteOpen(false)}
+                        className="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-600 text-xs font-bold py-3 rounded-xl transition-colors">
+                        ยกเลิก
+                      </button>
+                      <button type="button" onClick={handleDeleteConfirm} disabled={isModalSubmitting}
+                        className="flex-1 bg-red-600 hover:bg-red-700 text-white text-xs font-bold py-3 rounded-xl transition-all shadow-md flex items-center justify-center gap-1.5">
+                        {isModalSubmitting ? <Loader2 size={16} className="animate-spin" /> : <Trash2 size={16} />}
+                        <span>ยืนยันการลบ</span>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+
             </div>
           );
         }
